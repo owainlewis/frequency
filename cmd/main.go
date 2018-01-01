@@ -2,23 +2,19 @@ package main
 
 import (
 	"flag"
-	"io"
 	"net/http"
 
 	"github.com/golang/glog"
-	"github.com/owainlewis/kcd/pkg/batch/orchestrator"
+	"github.com/owainlewis/kcd/pkg/controller"
+	"github.com/owainlewis/kcd/pkg/orchestrator"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func index(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "KCD")
-}
+var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
 
 func main() {
-	var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
-
 	flag.Parse()
 
 	client, err := buildClient(*kubeconfig)
@@ -27,15 +23,26 @@ func main() {
 		return
 	}
 
-	orchestrator := orchestrator.NewOrchestrator(client)
+	startPodController(client)
 
-	_, err = orchestrator.CreateJob("default", "ubuntu", []string{"echo", "Hello KCD!"})
+	orch := orchestrator.NewOrchestrator(client)
+
+	_, err = orch.CreatePod("default", "ubuntu", []string{"echo", "Hello KCD"})
+
 	if err != nil {
-		glog.Errorf("Failed to create batch job: %s", err.Error())
+		glog.Errorf("Failed to create pod %s", err.Error())
 	}
 
 	http.Handle("/", http.FileServer(http.Dir("./ui/src")))
 	http.ListenAndServe(":3000", nil)
+}
+
+func startPodController(client *kubernetes.Clientset) {
+	ctrl := controller.NewController(client)
+	stop := make(chan struct{})
+
+	defer close(stop)
+	go ctrl.Run(1, stop)
 }
 
 func buildClient(cnf string) (*kubernetes.Clientset, error) {

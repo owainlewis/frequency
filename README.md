@@ -9,18 +9,14 @@ A simple API that can be used to launch Kubernetes Jobs.
 A simple YAML format for builds
 
 ```yaml
-jobs:
+stages:
   build:
-    image: ubuntu:latest
-    steps:
-    - checkout:
-      - git clone https://github.com/owainlewis/kcd.git
-    - test:
-      - go test
-  deploy:
-    image: ubuntu:latest
-    steps:
-    - push:
-      - docker login -u$DOCKER_USERNAME -p$DOCKER_PASSWORD
-      - docker push myimage:latest wcr.io/oracle/myimage
+    image: golang
+    script:
+      - go build cmd/main.go
+      
+  test:
+    image: golang
+    script:
+      - go test ./...
 ```

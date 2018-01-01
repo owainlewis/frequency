@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/owainlewis/kcd/pkg/batch/orchestrator"
-	v1 "k8s.io/api/batch/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -28,12 +27,9 @@ func main() {
 		return
 	}
 
-	job := &v1.Job{}
-
 	orchestrator := orchestrator.NewOrchestrator(client)
 
-	_, err = orchestrator.NewJob("default", job)
-
+	_, err = orchestrator.CreateJob("default", "ubuntu", []string{"echo", "Hello KCD!"})
 	if err != nil {
 		glog.Errorf("Failed to create batch job: %s", err.Error())
 	}

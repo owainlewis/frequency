@@ -7,6 +7,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/owainlewis/kcd/pkg/controller"
 	"github.com/owainlewis/kcd/pkg/orchestrator"
+	"github.com/owainlewis/kcd/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -27,7 +28,15 @@ func main() {
 
 	orch := orchestrator.NewOrchestrator(client)
 
-	_, err = orch.CreatePod("default", "ubuntu", []string{"echo", "Hello KCD"})
+	stage := types.Stage{
+		Name:  "hello-kcd",
+		Image: "ubuntu:latest",
+		Commands: []string{
+			"echo \"Hello World\"",
+		},
+	}
+
+	err = orch.ExecuteStage("default", stage)
 
 	if err != nil {
 		glog.Errorf("Failed to create pod %s", err.Error())

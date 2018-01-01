@@ -39,7 +39,7 @@ func main() {
 	err = orch.ExecuteStage("default", stage)
 
 	if err != nil {
-		glog.Errorf("Failed to create pod %s", err.Error())
+		glog.Errorf("Orchestration failed: %s", err.Error())
 	}
 
 	http.Handle("/", http.FileServer(http.Dir("./ui/src")))

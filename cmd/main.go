@@ -34,11 +34,8 @@ func main() {
 		glog.Errorf("Failed to create batch job: %s", err.Error())
 	}
 
-	http.HandleFunc("/", index)
-
-	glog.Info("Starting server on port 8080")
-
-	http.ListenAndServe(":8080", nil)
+	http.Handle("/", http.FileServer(http.Dir("./ui/src")))
+	http.ListenAndServe(":3000", nil)
 }
 
 func buildClient(cnf string) (*kubernetes.Clientset, error) {

@@ -1,0 +1,14 @@
+.header {
+    background: #333;
+    height: 72px;
+}
+
+.header .logo {
+    line-height: 72px;
+    color: white;
+    font-weight: bold;
+}
+
+.content {
+    padding: 24px 0;
+}

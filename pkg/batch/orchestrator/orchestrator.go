@@ -1,6 +1,9 @@
 package orchestrator
 
 import (
+	"io"
+	"os"
+
 	glog "github.com/golang/glog"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +32,12 @@ func (o Orchestrator) CreateJob(namespace string, image string, commands []strin
 
 	glog.Infof("Job is %v", job)
 
+	err = o.Logs(namespace, "mycontainer")
+
+	if err != nil {
+		glog.Errorf("Failed to get logs: %s", err.Error())
+	}
+
 	return job, nil
 }
 
@@ -36,7 +45,7 @@ func (o Orchestrator) CreateJob(namespace string, image string, commands []strin
 func newJob(image string, commands []string) *v1.Job {
 	return &v1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "myjob",
+			Name: "myjob3",
 		},
 		Spec: v1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -54,4 +63,18 @@ func newJob(image string, commands []string) *v1.Job {
 			},
 		},
 	}
+}
+
+// Logs will return a stream of logs from the job contatiner
+// TODO this will require a lot of design
+func (o Orchestrator) Logs(namespace, container string) error {
+	req := o.clientset.CoreV1().Pods(namespace).GetLogs("mycontainer", &corev1.PodLogOptions{})
+	readCloser, err := req.Stream()
+	if err != nil {
+		return err
+	}
+
+	defer readCloser.Close()
+	_, err = io.Copy(os.Stdout, readCloser)
+	return err
 }

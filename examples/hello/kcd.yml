@@ -1,0 +1,4 @@
+hello:
+  image: ubuntu:latest
+  script:
+    - echo "Hello World!"

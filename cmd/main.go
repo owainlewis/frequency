@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/golang/glog"
+	"github.com/owainlewis/kcd/pkg/batch/orchestrator"
+	v1 "k8s.io/api/batch/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -20,10 +22,20 @@ func main() {
 
 	flag.Parse()
 
-	_, err := buildClient(*kubeconfig)
+	client, err := buildClient(*kubeconfig)
 	if err != nil {
 		glog.Errorf("Failed to build client: %s", err)
 		return
+	}
+
+	job := &v1.Job{}
+
+	orchestrator := orchestrator.NewOrchestrator(client)
+
+	_, err = orchestrator.NewJob("default", job)
+
+	if err != nil {
+		glog.Errorf("Failed to create batch job: %s", err.Error())
 	}
 
 	http.HandleFunc("/", index)

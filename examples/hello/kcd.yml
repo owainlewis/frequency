@@ -1,4 +1,12 @@
-hello:
-  image: ubuntu:latest
-  script:
-    - echo "Hello World!"
+version: 1
+workspace:
+  path: /go/src/github.com/owainlewis/kcd
+pipeline:
+  build:
+    image: golang
+    environment:
+      - FOO=bar
+    commands:
+      - echo "Running tests..."
+      - go test ./...
+      - echo "DONE"

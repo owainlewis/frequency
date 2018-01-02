@@ -34,14 +34,22 @@ func (o Orchestrator) createPod(namespace string, image string, commands []strin
 }
 
 func newPod(image string, commands []string) *v1.Pod {
+	primary := v1.Container{
+		Name:    "primary",
+		Image:   image,
+		Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
+	}
+
+	agent := v1.Container{
+		Name:    "agent",
+		Image:   "ubuntu",
+		Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
+	}
+
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name:    "mycontainer",
-				Image:   image,
-				Command: commands,
-			}},
-			RestartPolicy: v1.RestartPolicyOnFailure,
+			Containers:    []v1.Container{primary, agent},
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 

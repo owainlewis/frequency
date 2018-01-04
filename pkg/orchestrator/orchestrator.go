@@ -37,6 +37,10 @@ func newPod(image string, commands []string) *v1.Pod {
 	primary := v1.Container{
 		Name:    "primary",
 		Image:   image,
+		Env: []v1.EnvVar{{
+			Name: "DEBIAN_FRONTEND",
+			Value: "noninteractive",
+		}}
 		Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
 	}
 

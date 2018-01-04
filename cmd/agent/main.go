@@ -30,7 +30,7 @@ func main() {
 
 	executor := exec.NewExecutor(config, client)
 
-	stdOut, stdErr, err := executor.Command("default", "kcd-gcr8d", "/bin/bash", "-c", "apt-get install -y emacs")
+	stdOut, stdErr, err := executor.Command("default", "kcd-gcr8d", "/bin/sh", "-c", "DEBIAN_FRONTEND=noninteractive apt-get install -y curl")
 
 	fmt.Printf("Result: %s %s", stdOut, stdErr)
 

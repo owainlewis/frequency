@@ -25,6 +25,10 @@ jobs:
 
 Terminology reference.
 
+### Project
+
+A project is typically a software project that lives in version control and contains a kcd.yml file.
+
 ### Job
 
 The smallest unit of execution in KCD. A stage is the execution of some commands inside a base image.

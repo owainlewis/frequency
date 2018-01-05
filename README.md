@@ -9,7 +9,7 @@ A simple API that can be used to launch Kubernetes Jobs.
 A simple YAML format for builds
 
 ```yaml
-stages:
+jobs:
   build:
     image: golang
     script:
@@ -30,6 +30,6 @@ Terminology reference.
 A pipeline is a collection of multiple stages to be run in some order. Stages may be executed parallel.
 A pipeline forms a Directed Acyclic Graph of stages to be executed.
 
-### Stage
+### Job
 
 The smallest unit of execution in KCD. A stage is the execution of some commands inside a base image.

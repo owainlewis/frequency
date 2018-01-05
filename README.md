@@ -25,11 +25,10 @@ jobs:
 
 Terminology reference.
 
-### Pipeline
-
-A pipeline is a collection of multiple stages to be run in some order. Stages may be executed parallel.
-A pipeline forms a Directed Acyclic Graph of stages to be executed.
-
 ### Job
 
 The smallest unit of execution in KCD. A stage is the execution of some commands inside a base image.
+
+### Workflow
+
+A workflow describes a series of jobs to be run in a specific order.

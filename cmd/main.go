@@ -9,8 +9,6 @@ import (
 	"github.com/owainlewis/kcd/pkg/controller"
 	"github.com/owainlewis/kcd/pkg/orchestrator"
 	"github.com/owainlewis/kcd/pkg/types"
-
-	"k8s.io/client-go/kubernetes"
 )
 
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
@@ -25,15 +23,21 @@ func main() {
 		return
 	}
 
-	startPodController(client)
+	ctrl := controller.NewController(client)
+	stop := make(chan struct{})
+
+	defer close(stop)
+	go ctrl.Run(1, stop)
 
 	orch := orchestrator.NewOrchestrator(client)
 
 	stage := types.Stage{
 		Name:  "hello-kcd",
-		Image: "ubuntu:latest",
+		Image: "golang",
 		Commands: []string{
-			"echo \"Hello World\"",
+			"go build -v main.go",
+			"mv ./main $OUTPUT_DIR",
+			"ls $OUTPUT_DIR",
 		},
 	}
 
@@ -45,12 +49,4 @@ func main() {
 
 	http.Handle("/", http.FileServer(http.Dir("./ui/src")))
 	http.ListenAndServe(":3000", nil)
-}
-
-func startPodController(client *kubernetes.Clientset) {
-	ctrl := controller.NewController(client)
-	stop := make(chan struct{})
-
-	defer close(stop)
-	go ctrl.Run(1, stop)
 }

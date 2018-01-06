@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -22,13 +23,11 @@ type Controller struct {
 }
 
 func NewController(clientset kubernetes.Interface) *Controller {
-
-	// create the pod watcher
+	// create the pod watcher (TODO filter by label)
 	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
 
 	// create the workqueue
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-
 	indexer, informer := cache.NewIndexerInformer(podListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -43,8 +42,6 @@ func NewController(clientset kubernetes.Interface) *Controller {
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-			// key function.
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			if err == nil {
 				queue.Add(key)
@@ -60,26 +57,18 @@ func NewController(clientset kubernetes.Interface) *Controller {
 }
 
 func (c *Controller) processNextItem() bool {
-	// Wait until there is a new item in the working queue
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
-	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
-	// This allows safe parallel processing because two pods with the same key are never processed in
-	// parallel.
+
 	defer c.queue.Done(key)
 
-	// Invoke the method containing the business logic
 	err := c.handle(key.(string))
-	// Handle the error if something went wrong during the execution of the business logic
 	c.handleErr(err, key)
 	return true
 }
 
-// syncToStdout is the business logic of the controller. In this controller it simply prints
-// information about the pod to stdout. In case an error happened, it has to simply return the error.
-// The retry logic should not be part of the business logic.
 func (c *Controller) handle(key string) error {
 	obj, exists, err := c.indexer.GetByKey(key)
 	if err != nil {
@@ -93,7 +82,13 @@ func (c *Controller) handle(key string) error {
 	} else {
 		// Note that you also have to check the uid if you have a local controlled resource, which
 		// is dependent on the actual instance, to detect that a Pod was recreated with the same name
-		fmt.Printf("Sync/Add/Update for Pod %s\n", obj.(*v1.Pod).GetName())
+		pod := obj.(*v1.Pod)
+
+		// TODO (remove me)
+		if strings.HasPrefix(pod.Name, "kcd-") {
+			glog.Infof("Pod status %s", pod.Status.Phase)
+			fmt.Printf("Sync/Add/Update for Pod %s\n", obj.(*v1.Pod).GetName())
+		}
 	}
 	return nil
 }
@@ -101,9 +96,6 @@ func (c *Controller) handle(key string) error {
 // handleErr checks if an error happened and makes sure we will retry later.
 func (c *Controller) handleErr(err error, key interface{}) {
 	if err == nil {
-		// Forget about the #AddRateLimited history of the key on every successful synchronization.
-		// This ensures that future processing of updates for this key is not delayed because of
-		// an outdated error history.
 		c.queue.Forget(key)
 		return
 	}
@@ -126,14 +118,11 @@ func (c *Controller) handleErr(err error, key interface{}) {
 
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
-
-	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
+
 	glog.Info("Starting Pod controller")
 
 	go c.informer.Run(stopCh)
-
-	// Wait for all involved caches to be synced, before processing items from the queue is started
 	if !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) {
 		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
 		return

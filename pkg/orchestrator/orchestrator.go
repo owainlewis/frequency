@@ -2,9 +2,9 @@ package orchestrator
 
 import (
 	"github.com/golang/glog"
-
 	types "github.com/owainlewis/kcd/pkg/types"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
 )
 
@@ -25,7 +25,8 @@ func (o Orchestrator) ExecuteStage(namespace string, stage types.Stage) error {
 	template := newPod(stage.Image, stage.Commands)
 
 	// TODO which namespace to run in (must be configurable)
-	_, err := o.clientset.CoreV1().Pods(namespace).Create(template)
+	pod, err := o.clientset.CoreV1().Pods(namespace).Create(template)
+	glog.Infof("Created pod %s for execution", pod.Name)
 
 	return err
 }
@@ -36,34 +37,65 @@ func (o Orchestrator) createPod(namespace string, image string, commands []strin
 	return o.clientset.CoreV1().Pods(namespace).Create(template)
 }
 
-func newPod(image string, commands []string) *v1.Pod {
-	primary := v1.Container{
-		Name:  "primary",
-		Image: image,
-		VolumeMounts: []v1.VolumeMount{{
-			Name:      "workspace",
-			MountPath: "/workspace",
-		}},
-		Command: []string{shell, "-c", "tail -f /dev/null"},
+// Hacky way to do this. TODO can we refine here?
+func formatCommands(commands []string) []string {
+	cmdStr := ""
+	for _, c := range commands {
+		cmdStr = cmdStr + c + ";"
 	}
 
-	agent := v1.Container{
-		Name:  "agent",
-		Image: "ubuntu",
-		VolumeMounts: []v1.VolumeMount{{
-			Name:      "workspace",
-			MountPath: "/workspace",
+	return []string{shell, "-c", cmdStr}
+}
+
+func newPod(image string, commands []string) *v1.Pod {
+	primary := v1.Container{
+		Name:       "primary",
+		Image:      image,
+		WorkingDir: "/workspace",
+		Env: []v1.EnvVar{{
+			Name:  "OUTPUT_DIR",
+			Value: "/output",
 		}},
-		Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
+		VolumeMounts: []v1.VolumeMount{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+			},
+			{
+				Name:      "output",
+				MountPath: "/output",
+			}},
+		Command: formatCommands(commands),
 	}
 
 	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"owner": "kcd",
+			},
+		},
 		Spec: v1.PodSpec{
-			Containers:    []v1.Container{primary, agent},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{{
-				Name: "workspace",
+			Containers: []v1.Container{primary},
+			InitContainers: []v1.Container{{
+				Name:  "setup",
+				Image: "alpine/git",
+				VolumeMounts: []v1.VolumeMount{{
+					Name:      "workspace",
+					MountPath: "/workspace",
+				}},
+				Command: []string{
+					"ash", "-c", "git clone https://github.com/owainlewis/hello-spinnaker.git /workspace/",
+				},
 			}},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: "workspace",
+				},
+				{
+					Name: "output",
+				},
+			},
 		},
 	}
 

@@ -11,17 +11,19 @@ import (
 // Should be configurable
 const shell = "/bin/bash"
 
-type Orchestrator struct {
+// Executor controls how jobs are executed inside Kubernetes
+type Executor struct {
 	clientset kubernetes.Interface
 }
 
-// NewOrchestrator creates a properly configured Job orchestrator
-func NewOrchestrator(clientset kubernetes.Interface) Orchestrator {
-	return Orchestrator{clientset: clientset}
+// NewExecutor creates a properly configured Job Executor
+func NewExecutor(clientset kubernetes.Interface) Executor {
+	return Executor{clientset: clientset}
 }
 
-func (o Orchestrator) ExecuteStage(namespace string, stage types.Stage) error {
-	glog.Infof("Executing stage: ", stage.Name)
+// Execute will execute a single job
+func (o Executor) Execute(namespace string, stage types.Stage) error {
+	glog.Infof("Executing job: ", stage.Name)
 	template := newPod(stage.Image, stage.Commands)
 
 	// TODO which namespace to run in (must be configurable)
@@ -31,7 +33,7 @@ func (o Orchestrator) ExecuteStage(namespace string, stage types.Stage) error {
 	return err
 }
 
-func (o Orchestrator) createPod(namespace string, image string, commands []string) (*v1.Pod, error) {
+func (o Executor) createPod(namespace string, image string, commands []string) (*v1.Pod, error) {
 	template := newPod(image, commands)
 
 	return o.clientset.CoreV1().Pods(namespace).Create(template)

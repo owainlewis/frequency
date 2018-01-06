@@ -7,7 +7,6 @@ import (
 	"github.com/golang/glog"
 	builder "github.com/owainlewis/kcd/pkg/client"
 	"github.com/owainlewis/kcd/pkg/controller"
-	"github.com/owainlewis/kcd/pkg/orchestrator"
 	"github.com/owainlewis/kcd/pkg/types"
 )
 
@@ -29,9 +28,9 @@ func main() {
 	defer close(stop)
 	go ctrl.Run(1, stop)
 
-	orch := orchestrator.NewOrchestrator(client)
+	exec := executor.NewExecutor(client)
 
-	stage := types.Stage{
+	job := types.Job{
 		Name:  "hello-kcd",
 		Image: "golang",
 		Commands: []string{
@@ -41,10 +40,9 @@ func main() {
 		},
 	}
 
-	err = orch.ExecuteStage("default", stage)
-
+	err = exec.Execute("default", job)
 	if err != nil {
-		glog.Errorf("Orchestration failed: %s", err.Error())
+		glog.Errorf("Execution failed: %s", err.Error())
 	}
 
 	http.Handle("/", http.FileServer(http.Dir("./ui/src")))

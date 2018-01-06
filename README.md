@@ -36,3 +36,9 @@ The smallest unit of execution in KCD. A stage is the execution of some commands
 ### Workflow
 
 A workflow describes a series of jobs to be run in a specific order.
+
+## TODO
+
+* Get log streaming from container to upstream API to capture output.
+* Parser
+* UI basics done

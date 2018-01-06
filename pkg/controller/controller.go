@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -78,17 +77,13 @@ func (c *Controller) handle(key string) error {
 
 	if !exists {
 		// Below we will warm up our cache with a Pod, so that we will see a delete for one pod
-		fmt.Printf("Pod %s does not exist anymore\n", key)
+		glog.Infof("Pod %s does not exist anymore\n", key)
 	} else {
 		// Note that you also have to check the uid if you have a local controlled resource, which
 		// is dependent on the actual instance, to detect that a Pod was recreated with the same name
 		pod := obj.(*v1.Pod)
 
-		// TODO (remove me)
-		if strings.HasPrefix(pod.Name, "kcd-") {
-			glog.Infof("Pod status %s", pod.Status.Phase)
-			fmt.Printf("Sync/Add/Update for Pod %s\n", obj.(*v1.Pod).GetName())
-		}
+		c.podUpdateHandler(pod)
 	}
 	return nil
 }

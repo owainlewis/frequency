@@ -8,6 +8,8 @@ import (
 	builder "github.com/owainlewis/kcd/pkg/client"
 	"github.com/owainlewis/kcd/pkg/controller"
 	"github.com/owainlewis/kcd/pkg/types"
+
+	executor "github.com/owainlewis/kcd/pkg/executor"
 )
 
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")

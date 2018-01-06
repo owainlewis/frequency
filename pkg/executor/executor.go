@@ -22,12 +22,12 @@ func NewExecutor(clientset kubernetes.Interface) Executor {
 }
 
 // Execute will execute a single job
-func (o Executor) Execute(namespace string, stage types.Stage) error {
-	glog.Infof("Executing job: ", stage.Name)
-	template := newPod(stage.Image, stage.Commands)
+func (o Executor) Execute(job types.Job) error {
+	glog.Infof("Executing job: ", job.Name)
+	template := newPod(job.Image, job.Commands)
 
 	// TODO which namespace to run in (must be configurable)
-	pod, err := o.clientset.CoreV1().Pods(namespace).Create(template)
+	pod, err := o.clientset.CoreV1().Pods(v1.NamespaceDefault).Create(template)
 	glog.Infof("Created pod %s for execution", pod.Name)
 
 	return err

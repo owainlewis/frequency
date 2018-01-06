@@ -15,6 +15,8 @@ func (c *Controller) podUpdateHandler(pod *v1.Pod) {
 	if strings.HasPrefix(pod.Name, "kcd-") {
 		glog.Infof("Pod %s is in phase %s", pod.GetName(), pod.Status.Phase)
 
+		// Update the status of the job in the API
+
 		// LOGS
 
 	}

@@ -33,6 +33,10 @@ A project is typically a software project that lives in version control and cont
 
 The smallest unit of execution in KCD. A stage is the execution of some commands inside a base image.
 
+#### Context
+
+A job is executed within a context. This means that a job executes with some metadata about the branch etc
+
 ### Workflow
 
 A workflow describes a series of jobs to be run in a specific order.

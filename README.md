@@ -9,16 +9,17 @@ A simple API that can be used to launch Kubernetes Jobs.
 A simple YAML format for builds
 
 ```yaml
+version: 1
 jobs:
   build:
     image: golang
-    script:
-      - go build cmd/main.go
-
-  test:
-    image: golang
-    script:
-      - go test ./...
+    workspace: /go/src/github.com/owainlewis/kcd
+    environment:
+      - FOO=bar
+    steps:
+      - echo "Running tests..."
+      - go build main.go
+      - mv main {{ .Values.OutputDirectory }}
 ```
 
 ## Domain Language

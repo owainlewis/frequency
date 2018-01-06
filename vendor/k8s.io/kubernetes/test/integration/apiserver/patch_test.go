@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -28,19 +26,19 @@ import (
 
 	"reflect"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // Tests that the apiserver retries non-overlapping conflicts on patches
 func TestPatchConflicts(t *testing.T) {
-	s, clientSet := setup(t)
-	defer s.Close()
+	s, clientSet, closeFn := setup(t)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("status-code", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

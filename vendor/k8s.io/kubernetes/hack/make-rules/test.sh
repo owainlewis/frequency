@@ -27,6 +27,20 @@ kube::golang::setup_env
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# panic the server on watch decode errors since they are considered coder mistakes
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+export KUBE_PANIC_WATCH_DECODE_ERROR
+
+# Handle case where OS has sha#sum commands, instead of shasum.
+if which shasum >/dev/null 2>&1; then
+  SHA1SUM="shasum -a1"
+elif which sha1sum >/dev/null 2>&1; then
+  SHA1SUM="sha1sum"
+else
+  echo "Failed to find shasum or sha1sum utility." >&2
+  exit 1
+fi
+
 kube::test::find_dirs() {
   (
     cd ${KUBE_ROOT}
@@ -70,6 +84,13 @@ kube::test::find_dirs() {
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
 
     find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
+      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+
+    find ./staging/src/k8s.io/apiextensions-apiserver -not \( \
+        \( \
+          -path '*/test/integration/*' \
+        \) -prune \
+      \) -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
 
     find ./staging/src/k8s.io/sample-apiserver -name '*_test.go' \
@@ -147,7 +168,7 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "goflags=(${GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.
@@ -185,8 +206,8 @@ junitFilenamePrefix() {
   # exceeding 255 character filename limit. KUBE_TEST_API
   # barely fits there and in coverage mode test names are
   # appended to generated file names, easily exceeding
-  # 255 chars in length. So let's just sha1sum it.
-  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|sha1sum|awk '{print $1}')"
+  # 255 chars in length. So let's just use a sha1 hash of it.
+  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
 }
 
@@ -236,7 +257,8 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API}/$(kube::util::sortable_date)"
+  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
+  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
@@ -252,11 +274,11 @@ runTests() {
   # separate files.
 
   # ignore paths:
-  # cmd/libs/go2idl/generator: is fragile when run under coverage, so ignore it for now.
+  # vendor/k8s.io/code-generator/cmd/generator: is fragile when run under coverage, so ignore it for now.
   #                            https://github.com/kubernetes/kubernetes/issues/24967
   # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
   #                            https://github.com/golang/go/issues/16540
-  cover_ignore_dirs="cmd/libs/go2idl/generator|vendor/k8s.io/client-go/1.4/rest"
+  cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
   for path in $(echo $cover_ignore_dirs | sed 's/|/ /g'); do
       echo -e "skipped\tk8s.io/kubernetes/$path"
   done

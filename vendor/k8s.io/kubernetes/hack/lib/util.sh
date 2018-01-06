@@ -205,6 +205,7 @@ kube::util::gen-docs() {
   mkdir -p "${dest}/docs/admin/"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
+  "${genkubedocs}" "${dest}/docs/admin/" "cloud-controller-manager"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
@@ -214,10 +215,12 @@ kube::util::gen-docs() {
   # to generate. The actual binary for running federation is hyperkube.
   "${genfeddocs}" "${dest}/docs/admin/" "federation-apiserver"
   "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
+  "${genfeddocs}" "${dest}/docs/admin/" "kubefed"
 
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
   "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
+  "${genman}" "${dest}/docs/man/man1/" "cloud-controller-manager"
   "${genman}" "${dest}/docs/man/man1/" "kube-proxy"
   "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
   "${genman}" "${dest}/docs/man/man1/" "kubelet"
@@ -313,7 +316,27 @@ kube::util::analytics-link() {
 # * Special handling for groups suffixed with ".k8s.io": foo.k8s.io/v1 -> apis/foo/v1
 # * Very special handling for when both group and version are "": / -> api
 kube::util::group-version-to-pkg-path() {
+  staging_apis=(
+  $(
+    pushd ${KUBE_ROOT}/staging/src/k8s.io/api > /dev/null
+      find . -name types.go | xargs -n1 dirname | sed "s|\./||g" | sort
+    popd > /dev/null
+  )
+  )
+
   local group_version="$1"
+
+  if [[ " ${staging_apis[@]} " =~ " ${group_version/.*k8s.io/} " ]]; then
+    echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
+    return
+  fi
+
+  # "v1" is the API GroupVersion
+  if [[ "${group_version}" == "v1" ]]; then
+    echo "vendor/k8s.io/api/core/v1"
+    return
+  fi
+
   # Special cases first.
   # TODO(lavalamp): Simplify this by moving pkg/api/v1 and splitting pkg/api,
   # moving the results to pkg/apis/api.
@@ -321,9 +344,6 @@ kube::util::group-version-to-pkg-path() {
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
     __internal)
       echo "pkg/api"
-      ;;
-    v1)
-      echo "pkg/api/v1"
       ;;
     federation/v1beta1)
       echo "federation/apis/federation/v1beta1"
@@ -333,6 +353,12 @@ kube::util::group-version-to-pkg-path() {
       ;;
     meta/v1)
       echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
+      ;;
+    meta/v1alpha1)
+      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+      ;;
+    meta/v1alpha1)
+      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
       ;;
     unversioned)
       echo "pkg/api/unversioned"
@@ -411,6 +437,23 @@ kube::util::git_upstream_remote_name() {
     head -n 1 | awk '{print $1}'
 }
 
+# Ensures the current directory is a git tree for doing things like restoring or
+# validating godeps
+kube::util::create-fake-git-tree() {
+  local -r target_dir=${1:-$(pwd)}
+
+  pushd "${target_dir}" >/dev/null
+    git init >/dev/null
+    git config --local user.email "nobody@k8s.io"
+    git config --local user.name "$0"
+    git add . >/dev/null
+    git commit -q -m "Snapshot" >/dev/null
+    if (( ${KUBE_VERBOSE:-5} >= 6 )); then
+      kube::log::status "${target_dir} is now a git tree."
+    fi
+  popd >/dev/null
+}
+
 # Checks whether godep restore was run in the current GOPATH, i.e. that all referenced repos exist
 # and are checked out to the referenced rev.
 kube::util::godep_restored() {
@@ -458,10 +501,12 @@ kube::util::godep_restored() {
 kube::util::ensure_clean_working_dir() {
   while ! git diff HEAD --exit-code &>/dev/null; do
     echo -e "\nUnexpected dirty working directory:\n"
-    git status -s | sed 's/^/  /'
-    if ! tty -s; then
+    if tty -s; then
+        git status -s
+    else
+        git diff -a # be more verbose in log files without tty
         exit 1
-    fi
+    fi | sed 's/^/  /'
     echo -e "\nCommit your changes in another terminal and then continue here by pressing enter."
     read
   done 1>&2
@@ -470,22 +515,63 @@ kube::util::ensure_clean_working_dir() {
 # Ensure that the given godep version is installed and in the path
 kube::util::ensure_godep_version() {
   GODEP_VERSION=${1:-"v79"}
-  if [[ "$(godep version)" == *"godep ${GODEP_VERSION}"* ]]; then
+  if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
   fi
 
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
 
-  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
-    git checkout "${GODEP_VERSION}"
+    git checkout -q "${GODEP_VERSION}"
     GOPATH="${KUBE_TEMP}/go" go install .
   popd >/dev/null
 
   PATH="${KUBE_TEMP}/go/bin:${PATH}"
   hash -r # force bash to clear PATH cache
   godep version
+}
+
+# Ensure that none of the staging repos is checked out in the GOPATH because this
+# easily confused godep.
+kube::util::ensure_no_staging_repos_in_gopath() {
+  kube::util::ensure_single_dir_gopath
+  local error=0
+  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
+    if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
+      echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
+      error=1
+    fi
+  done
+  if [ "${error}" = "1" ]; then
+    exit 1
+  fi
+}
+
+# Installs the specified go package at a particular commit.
+kube::util::go_install_from_commit() {
+  local -r pkg=$1
+  local -r commit=$2
+
+  kube::util::ensure-temp-dir
+  mkdir -p "${KUBE_TEMP}/go/src"
+  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
+  (
+    cd "${KUBE_TEMP}/go/src/${pkg}"
+    git checkout -q "${commit}"
+    GOPATH="${KUBE_TEMP}/go" go install "${pkg}"
+  )
+  PATH="${KUBE_TEMP}/go/bin:${PATH}"
+  hash -r # force bash to clear PATH cache
+}
+
+# Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.
+kube::util::ensure_single_dir_gopath() {
+  if [[ "${GOPATH}" == *:* ]]; then
+    echo "GOPATH must consist of a single directory." 1>&2
+    exit 1
+  fi
 }
 
 # Checks whether there are any files matching pattern $2 changed between the
@@ -535,20 +621,6 @@ kube::util::download_file() {
     fi
   done
   return 1
-}
-
-# Test whether cfssl and cfssljson are installed.
-# Sets:
-#  CFSSL_BIN: The path of the installed cfssl binary
-#  CFSSLJSON_BIN: The path of the installed cfssljson binary
-function kube::util::test_cfssl_installed {
-    if ! command -v cfssl &>/dev/null || ! command -v cfssljson &>/dev/null; then
-      echo "Failed to successfully run 'cfssl', please verify that cfssl and cfssljson are in \$PATH."
-      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
-      exit 1
-    fi
-    CFSSL_BIN=$(command -v cfssl)
-    CFSSLJSON_BIN=$(command -v cfssljson)
 }
 
 # Test whether openssl is installed.
@@ -694,6 +766,103 @@ EOF
   fi
 }
 
+# Wait for background jobs to finish. Return with
+# an error status if any of the jobs failed.
+kube::util::wait-for-jobs() {
+  local fail=0
+  local job
+  for job in $(jobs -p); do
+    wait "${job}" || fail=$((fail + 1))
+  done
+  return ${fail}
+}
 
+# kube::util::join <delim> <list...>
+# Concatenates the list elements with the delimiter passed as first parameter
+#
+# Ex: kube::util::join , a b c
+#  -> a,b,c
+function kube::util::join {
+  local IFS="$1"
+  shift
+  echo "$*"
+}
+
+# Downloads cfssl/cfssljson into $1 directory if they do not already exist in PATH
+#
+# Assumed vars:
+#   $1 (cfssl directory) (optional)
+#
+# Sets:
+#  CFSSL_BIN: The path of the installed cfssl binary
+#  CFSSLJSON_BIN: The path of the installed cfssljson binary
+#
+function kube::util::ensure-cfssl {
+  if command -v cfssl &>/dev/null && command -v cfssljson &>/dev/null; then
+    CFSSL_BIN=$(command -v cfssl)
+    CFSSLJSON_BIN=$(command -v cfssljson)
+    return 0
+  fi
+
+  # Create a temp dir for cfssl if no directory was given
+  local cfssldir=${1:-}
+  if [[ -z "${cfssldir}" ]]; then
+    kube::util::ensure-temp-dir
+    cfssldir="${KUBE_TEMP}/cfssl"
+  fi
+
+  mkdir -p "${cfssldir}"
+  pushd "${cfssldir}" > /dev/null
+
+    echo "Unable to successfully run 'cfssl' from $PATH; downloading instead..."
+    kernel=$(uname -s)
+    case "${kernel}" in
+      Linux)
+        curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+        curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+        ;;
+      Darwin)
+        curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
+        curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
+        ;;
+      *)
+        echo "Unknown, unsupported platform: ${kernel}." >&2
+        echo "Supported platforms: Linux, Darwin." >&2
+        exit 2
+    esac
+
+    chmod +x cfssl || true
+    chmod +x cfssljson || true
+
+    CFSSL_BIN="${cfssldir}/cfssl"
+    CFSSLJSON_BIN="${cfssldir}/cfssljson"
+    if [[ ! -x ${CFSSL_BIN} || ! -x ${CFSSLJSON_BIN} ]]; then
+      echo "Failed to download 'cfssl'. Please install cfssl and cfssljson and verify they are in \$PATH."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+      exit 1
+    fi
+  popd > /dev/null
+}
+
+# kube::util::ensure_dockerized
+# Confirms that the script is being run inside a kube-build image
+#
+function kube::util::ensure_dockerized {
+  if [[ -f /kube-build-image ]]; then
+    return 0
+  else
+    echo "ERROR: This script is designed to be run inside a kube-build container"
+    exit 1
+  fi
+}
+
+# Some useful colors.
+if [[ -z "${color_start-}" ]]; then
+  declare -r color_start="\033["
+  declare -r color_red="${color_start}0;31m"
+  declare -r color_yellow="${color_start}0;33m"
+  declare -r color_green="${color_start}0;32m"
+  declare -r color_norm="${color_start}0m"
+fi
 
 # ex: ts=2 sw=2 et filetype=sh

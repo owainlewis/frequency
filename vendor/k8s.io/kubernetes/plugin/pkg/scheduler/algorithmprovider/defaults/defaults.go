@@ -14,17 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This is the default algorithm provider for the scheduler.
 package defaults
 
 import (
 	"os"
 	"strconv"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -35,19 +34,25 @@ import (
 )
 
 const (
+	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
-	// Larger Azure VMs can actually have much more disks attached. TODO We should determine the max based on VM size
+	// DefaultMaxAzureDiskVolumes defines the maximum number of PD Volumes for Azure
+	// Larger Azure VMs can actually have much more disks attached.
+	// TODO We should determine the max based on VM size
 	DefaultMaxAzureDiskVolumes = 16
-	ClusterAutoscalerProvider  = "ClusterAutoscalerProvider"
-	StatefulSetKind            = "StatefulSet"
-	KubeMaxPDVols              = "KUBE_MAX_PD_VOLS"
+	// ClusterAutoscalerProvider defines the default autoscaler provider
+	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+	// StatefulSetKind defines the name of 'StatefulSet' kind
+	StatefulSetKind = "StatefulSet"
+	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet
+	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
 )
 
 func init() {
 	// Register functions that extract metadata used by predicates and priorities computations.
 	factory.RegisterPredicateMetadataProducerFactory(
-		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
+		func(args factory.PluginFactoryArgs) algorithm.PredicateMetadataProducer {
 			return predicates.NewPredicateMetadataFactory(args.PodLister)
 		})
 	factory.RegisterPriorityMetadataProducerFactory(
@@ -61,6 +66,14 @@ func init() {
 	// Cluster autoscaler friendly scheduling algorithm.
 	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, defaultPredicates(),
 		copyAndReplace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
+
+	// IMPORTANT NOTES for predicate developers:
+	// We are using cached predicate result for pods belonging to the same equivalence class.
+	// So when implementing a new predicate, you are expected to check whether the result
+	// of your predicate function can be affected by related API object change (ADD/DELETE/UPDATE).
+	// If yes, you are expected to invalidate the cached predicate result for related API object change.
+	// For example:
+	// https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
 
 	// Registers predicates and priorities that are not enabled by default, but user can pick when creating his
 	// own set of priorities/predicates.
@@ -81,10 +94,14 @@ func init() {
 	// predicates.GeneralPredicates()
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
-	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
+	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
 
-	// Use equivalence class to speed up predicates & priorities
-	factory.RegisterGetEquivalencePodFunction(GetEquivalencePod)
+	// Use equivalence class to speed up heavy predicates phase.
+	factory.RegisterGetEquivalencePodFunction(
+		func(args factory.PluginFactoryArgs) algorithm.GetEquivalencePodFunc {
+			return predicates.NewEquivalencePodGenerator(args.PVCInfo)
+		},
+	)
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
 	// the number of pods (belonging to the same service) on the same node.
@@ -113,7 +130,7 @@ func init() {
 }
 
 func defaultPredicates() sets.String {
-	return sets.NewString(
+	predSet := sets.NewString(
 		// Fit is determined by volume zone requirements.
 		factory.RegisterFitPredicateFactory(
 			"NoVolumeZoneConflict",
@@ -150,7 +167,7 @@ func defaultPredicates() sets.String {
 		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
-			"MatchInterPodAffinity",
+			predicates.MatchInterPodAffinity,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
 			},
@@ -163,15 +180,33 @@ func defaultPredicates() sets.String {
 		// (e.g. kubelet and all schedulers)
 		factory.RegisterFitPredicate("GeneralPredicates", predicates.GeneralPredicates),
 
-		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints),
-
 		// Fit is determined by node memory pressure condition.
 		factory.RegisterFitPredicate("CheckNodeMemoryPressure", predicates.CheckNodeMemoryPressurePredicate),
 
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
+
+		// Fit is determined by volume zone requirements.
+		factory.RegisterFitPredicateFactory(
+			"NoVolumeNodeConflict",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo, nil)
+			},
+		),
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
+		// Fit is determined based on whether a pod can tolerate all of the node's taints
+		predSet.Insert(factory.RegisterMandatoryFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints))
+		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
+	} else {
+		// Fit is determied by node condtions: not ready, network unavailable and out of disk.
+		predSet.Insert(factory.RegisterMandatoryFitPredicate("CheckNodeCondition", predicates.CheckNodeConditionPredicate))
+		// Fit is determined based on whether a pod can tolerate all of the node's taints
+		predSet.Insert(factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints))
+	}
+
+	return predSet
 }
 
 func defaultPriorities() sets.String {
@@ -211,7 +246,7 @@ func defaultPriorities() sets.String {
 		// Prioritizes nodes that have labels matching NodeAffinity
 		factory.RegisterPriorityFunction2("NodeAffinityPriority", priorities.CalculateNodeAffinityPriorityMap, priorities.CalculateNodeAffinityPriorityReduce, 1),
 
-		// TODO: explain what it does.
+		// Prioritizes nodes that marked with taint which pod can tolerate.
 		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
 	)
 }
@@ -220,7 +255,7 @@ func defaultPriorities() sets.String {
 func getMaxVols(defaultVal int) int {
 	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
-			glog.Errorf("Unable to parse maxiumum PD volumes value, using default of %v: %v", defaultVal, err)
+			glog.Errorf("Unable to parse maximum PD volumes value, using default of %v: %v", defaultVal, err)
 		} else if parsedMaxVols <= 0 {
 			glog.Errorf("Maximum PD volumes must be a positive value, using default of %v", defaultVal)
 		} else {
@@ -238,29 +273,4 @@ func copyAndReplace(set sets.String, replaceWhat, replaceWith string) sets.Strin
 		result.Insert(replaceWith)
 	}
 	return result
-}
-
-// GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
-func GetEquivalencePod(pod *v1.Pod) interface{} {
-	equivalencePod := EquivalencePod{}
-	// For now we only consider pods:
-	// 1. OwnerReferences is Controller
-	// 2. OwnerReferences kind is in valid controller kinds
-	// 3. with same OwnerReferences
-	// to be equivalent
-	if len(pod.OwnerReferences) != 0 {
-		for _, ref := range pod.OwnerReferences {
-			if *ref.Controller {
-				equivalencePod.ControllerRef = ref
-				// a pod can only belongs to one controller
-				break
-			}
-		}
-	}
-	return &equivalencePod
-}
-
-// EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
-type EquivalencePod struct {
-	ControllerRef metav1.OwnerReference
 }

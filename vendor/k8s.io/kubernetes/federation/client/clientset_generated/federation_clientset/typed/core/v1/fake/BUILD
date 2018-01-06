@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -19,17 +17,16 @@ go_library(
         "fake_secret.go",
         "fake_service.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/testing",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

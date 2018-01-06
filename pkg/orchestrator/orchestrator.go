@@ -8,6 +8,9 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 )
 
+// Should be configurable
+const shell = "/bin/bash"
+
 type Orchestrator struct {
 	clientset kubernetes.Interface
 }
@@ -35,18 +38,22 @@ func (o Orchestrator) createPod(namespace string, image string, commands []strin
 
 func newPod(image string, commands []string) *v1.Pod {
 	primary := v1.Container{
-		Name:    "primary",
-		Image:   image,
-		Env: []v1.EnvVar{{
-			Name: "DEBIAN_FRONTEND",
-			Value: "noninteractive",
-		}}
-		Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
+		Name:  "primary",
+		Image: image,
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "workspace",
+			MountPath: "/workspace",
+		}},
+		Command: []string{shell, "-c", "tail -f /dev/null"},
 	}
 
 	agent := v1.Container{
-		Name:    "agent",
-		Image:   "ubuntu",
+		Name:  "agent",
+		Image: "ubuntu",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "workspace",
+			MountPath: "/workspace",
+		}},
 		Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
 	}
 
@@ -54,6 +61,9 @@ func newPod(image string, commands []string) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers:    []v1.Container{primary, agent},
 			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{{
+				Name: "workspace",
+			}},
 		},
 	}
 

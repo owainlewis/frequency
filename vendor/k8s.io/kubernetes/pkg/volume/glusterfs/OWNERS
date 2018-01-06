@@ -2,13 +2,12 @@ approvers:
 - rootfs
 - saad-ali
 - jingxu97
+- humblec
 reviewers:
 - thockin
 - smarterclayton
-- deads2k
 - brendandburns
 - derekwaynecarr
-- bprashanth
 - pmorie
 - saad-ali
 - justinsb
@@ -16,5 +15,4 @@ reviewers:
 - rootfs
 - humblec
 - jingxu97
-- rkouj
 - msau42

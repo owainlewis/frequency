@@ -30,10 +30,11 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 
+	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	nodepkg "k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -41,37 +42,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.
-// At the end (even in case of errors), the network traffic is brought back to normal.
-// This function executes commands on a node so it will work only for some
-// environments.
-func testUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host := framework.GetNodeExternalIP(node)
-	master := framework.GetMasterAddress(c)
-	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
-	defer func() {
-		// This code will execute even if setting the iptables rule failed.
-		// It is on purpose because we may have an error even if the new rule
-		// had been inserted. (yes, we could look at the error code and ssh error
-		// separately, but I prefer to stay on the safe side).
-		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		framework.UnblockNetwork(host, master)
-	}()
-
-	framework.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !framework.WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
-		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
-	}
-	framework.BlockNetwork(host, master)
-
-	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !framework.WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
-		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
-	}
-
-	testFunc()
-	// network traffic is unblocked in a deferred function
-}
+const (
+	timeout                = 60 * time.Second
+	podReadyTimeout        = 2 * time.Minute
+	podNotReadyTimeout     = 1 * time.Minute
+	nodeReadinessTimeout   = 3 * time.Minute
+	resizeNodeReadyTimeout = 2 * time.Minute
+)
 
 func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 	timeout := false
@@ -117,7 +94,7 @@ func podOnNode(podName, nodeName string, image string) *v1.Pod {
 }
 
 func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) error {
-	pod, err := c.Core().Pods(namespace).Create(podOnNode(podName, nodeName, serveHostnameImage))
+	pod, err := c.Core().Pods(namespace).Create(podOnNode(podName, nodeName, framework.ServeHostnameImage))
 	if err == nil {
 		framework.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
 	} else {
@@ -126,7 +103,7 @@ func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) er
 	return err
 }
 
-var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
+var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var systemPodsNo int32
 	var c clientset.Interface
@@ -140,6 +117,9 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = int32(len(systemPods))
+
+		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
+		framework.SkipUnlessProviderIs("gke", "aws")
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
@@ -150,7 +130,6 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 	framework.KubeDescribe("Pods", func() {
 		Context("should return to running and ready state after network partition is healed", func() {
 			BeforeEach(func() {
-				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
@@ -259,9 +238,9 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
-			newSVCByName(c, ns, name)
+			common.NewSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			newRCByName(c, ns, name, replicas, nil)
+			common.NewRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
@@ -281,7 +260,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas'.
 			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				Expect(err).NotTo(HaveOccurred())
@@ -324,9 +303,9 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			name := "my-hostname-net"
 			gracePeriod := int64(30)
 
-			newSVCByName(c, ns, name)
+			common.NewSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			newRCByName(c, ns, name, replicas, &gracePeriod)
+			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
@@ -346,7 +325,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas + 1'.
 			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
@@ -371,9 +350,10 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 		headlessSvcName := "test"
 
 		BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
+			framework.SkipUnlessProviderIs("gke")
 			By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
-			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 			framework.ExpectNoError(err)
 			c = f.ClientSet
@@ -382,7 +362,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				dumpDebugInfo(c, ns)
+				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all stateful set in ns %v", ns)
 			framework.DeleteAllStatefulSets(c, ns)
@@ -392,7 +372,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
-			_, err := c.Apps().StatefulSets(ns).Create(ps)
+			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := framework.NewStatefulSetTester(c)
@@ -400,7 +380,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			nn := framework.TestContext.CloudConfig.NumNodes
 			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
 			framework.ExpectNoError(err)
-			restartNodes(f, nodeNames)
+			common.RestartNodes(f.ClientSet, nodeNames)
 
 			By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
@@ -408,7 +388,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 		It("should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]", func() {
 			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
-			_, err := c.Apps().StatefulSets(ns).Create(ps)
+			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := framework.NewStatefulSetTester(c)
@@ -421,7 +401,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
 			// that belongs to StatefulSet 'statefulSetName', **does not** disappear due to forced deletion from the apiserver.
 			// The grace period on the stateful pods is set to a value > 0.
-			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Checking that the NodeController does not force delete stateful pods %v", pod.Name)
 				err := framework.WaitTimeoutForPodNoLongerRunningInNamespace(c, pod.Name, ns, 10*time.Minute)
 				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
@@ -441,9 +421,10 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 		It("should create new pods when node is partitioned", func() {
 			parallelism := int32(2)
 			completions := int32(4)
+			backoffLimit := int32(6) // default value
 
 			job := framework.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
-				parallelism, completions)
+				parallelism, completions, nil, backoffLimit)
 			job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
 			label := labels.SelectorFromSet(labels.Set(map[string]string{framework.JobSelectorKey: job.Name}))
@@ -464,7 +445,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// This creates a temporary network partition, verifies that the job has 'parallelism' number of
 			// running pods after the node-controller detects node unreachable.
 			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := framework.WaitForPodToDisappear(c, ns, pods.Items[0].Name, label, 20*time.Second, 10*time.Minute)
 				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
@@ -484,7 +465,6 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 	framework.KubeDescribe("Pods", func() {
 		Context("should be evicted from unready Node", func() {
 			BeforeEach(func() {
-				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 

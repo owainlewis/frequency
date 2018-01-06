@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,11 +13,10 @@ go_test(
         "reconcile_rolebindings_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/helper:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 
@@ -32,17 +29,19 @@ go_library(
         "reconcile_rolebindings.go",
         "role_interfaces.go",
         "rolebinding_interfaces.go",
+        "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -17,14 +15,13 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )
 
@@ -32,8 +29,7 @@ go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/spf13/pflag"],
+    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 filegroup(
@@ -47,8 +43,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/componentconfig/fuzzer:all-srcs",
         "//pkg/apis/componentconfig/install:all-srcs",
         "//pkg/apis/componentconfig/v1alpha1:all-srcs",
+        "//pkg/apis/componentconfig/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

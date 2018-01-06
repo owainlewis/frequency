@@ -33,11 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
-	replace_long = templates.LongDesc(`
+	replaceLong = templates.LongDesc(i18n.T(`
 		Replace a resource by filename or stdin.
 
 		JSON and YAML formats are accepted. If replacing an existing resource, the
@@ -45,9 +45,9 @@ var (
 
 		    $ kubectl get TYPE NAME -o yaml
 
-		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
+		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
 
-	replace_example = templates.Examples(`
+	replaceExample = templates.Examples(i18n.T(`
 		# Replace a pod using the data in pod.json.
 		kubectl replace -f ./pod.json
 
@@ -58,19 +58,17 @@ var (
 		kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
 
 		# Force replace, delete and then re-create the resource
-		kubectl replace --force -f ./pod.json`)
+		kubectl replace --force -f ./pod.json`))
 )
 
 func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
-		Use: "replace -f FILENAME",
-		// update is deprecated.
-		Aliases: []string{"update"},
+		Use:     "replace -f FILENAME",
 		Short:   i18n.T("Replace a resource by filename or stdin"),
-		Long:    replace_long,
-		Example: replace_example,
+		Long:    replaceLong,
+		Example: replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			err := RunReplace(f, out, cmd, args, options)
@@ -94,10 +92,7 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	if len(os.Args) > 1 && os.Args[1] == "update" {
-		printDeprecationWarning("replace", "update")
-	}
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
 	}
@@ -108,8 +103,8 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	force := cmdutil.GetFlagBool(cmd, "force")
-	if cmdutil.IsFilenameEmpty(options.Filenames) {
-		return cmdutil.UsageError(cmd, "Must specify --filename to replace")
+	if cmdutil.IsFilenameSliceEmpty(options.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
 	}
 
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
@@ -125,11 +120,17 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
+	mapper, _, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+
+	builder, err := f.NewUnstructuredBuilder(true)
+	if err != nil {
+		return err
+	}
+
+	r := builder.
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -170,7 +171,7 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 }
 
 func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
 	}
@@ -200,7 +201,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -227,7 +228,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
 		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, timeout, gracePeriod, waitForDeletion, shortOutput, mapper, false)
 	} else {
-		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+		err = DeleteResult(r, out, ignoreNotFound, gracePeriod, shortOutput, mapper)
 	}
 	if err != nil {
 		return err
@@ -249,7 +250,12 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		})
 	})
 
-	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	builder, err := f.NewUnstructuredBuilder(true)
+	if err != nil {
+		return err
+	}
+
+	r = builder.
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().

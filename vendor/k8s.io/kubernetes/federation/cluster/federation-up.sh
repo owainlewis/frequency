@@ -29,14 +29,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $FEDERATION_NAME, $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
-# $KUBEDNS_CONFIGMAP_NAME, $KUBEDNS_CONFIGMAP_NAMESPACE and
-# $KUBEDNS_FEDERATION_FLAG.
+# For $FEDERATION_NAME, $FEDERATION_NAMESPACE, $FEDERATION_KUBE_CONTEXT,
+# and $HOST_CLUSTER_CONTEXT.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
 DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
-FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
 # value in the federation `versions` file.
@@ -70,6 +68,29 @@ print json.load(sys.stdin)["KUBE_VERSION"]')"
   echo "${kube_version//+/_}"
 }
 
+function wait_for_rbac() {
+  # The very first thing that kubefed does when it comes up is run RBAC API
+  # discovery. If it doesn't appear to be available, issue 'get role' to ensure
+  # that kubectl updates its cache.
+  ${KUBE_ROOT}/cluster/kubectl.sh get role
+  local i=1
+  local timeout=60
+  while [[ ${i} -le ${timeout} ]]; do
+    if [[ "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)" =~ "rbac.authorization.k8s.io/" ]]; then
+      break
+    fi
+    ${KUBE_ROOT}/cluster/kubectl.sh get role
+    sleep 1
+    i=$((i+1))
+  done
+  if [[ ${i} -gt ${timeout} ]]; then
+    kube::log::status "rbac.authorization.k8s.io API group not available after at least ${timeout} seconds:"
+    kube::log::status "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)"
+    exit 123
+  fi
+  kube::log::status "rbac.authorization.k8s.io API group is available"
+}
+
 # Initializes the control plane.
 # TODO(madhusudancs): Move this to federation/develop.sh.
 function init() {
@@ -82,19 +103,22 @@ function init() {
   kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
   kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
 
+  wait_for_rbac
+
   # Send INT after 20m and KILL 1m after that if process is still alive.
   timeout --signal=INT --kill-after=1m 20m \
       "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
+      --federation-system-namespace=${FEDERATION_NAMESPACE} \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
       --dns-provider="${DNS_PROVIDER}" \
       --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
-      --apiserver-arg-overrides="--storage-backend=etcd2" \
       --apiserver-enable-basic-auth=true \
       --apiserver-enable-token-auth=true \
-      --apiserver-arg-overrides="--v=4" \
-      --controllermanager-arg-overrides="--v=4"
+      --apiserver-arg-overrides="--runtime-config=api/all=true,--v=4" \
+      --controllermanager-arg-overrides="--v=4" \
+      --v=4
 }
 
 # join_clusters joins the clusters in the local kubeconfig to federation. The clusters
@@ -105,18 +129,12 @@ function join_clusters() {
 
     "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
         "${context}" \
+        --federation-system-namespace=${FEDERATION_NAMESPACE} \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
-        --context="${FEDERATION_NAME}" \
-        --secret-name="${context//_/-}"    # Replace "_" by "-"
+        --context="${FEDERATION_KUBE_CONTEXT}" \
+        --v=4
   done
 }
 
-USE_KUBEFED="${USE_KUBEFED:-}"
-
-if [[ "${USE_KUBEFED}" == "true" ]]; then
-  init
-  join_clusters
-else
-  export FEDERATION_IMAGE_TAG="$(get_version)"
-  create-federation-api-objects
-fi
+init
+join_clusters

@@ -17,21 +17,21 @@ limitations under the License.
 package podgc
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
 	"github.com/golang/glog"
@@ -71,12 +71,17 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 }
 
 func (gcc *PodGCController) Run(stop <-chan struct{}) {
-	if !cache.WaitForCacheSync(stop, gcc.podListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	defer utilruntime.HandleCrash()
+
+	glog.Infof("Starting GC controller")
+	defer glog.Infof("Shutting down GC controller")
+
+	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced) {
 		return
 	}
 
 	go wait.Until(gcc.gc, gcCheckPeriod, stop)
+
 	<-stop
 }
 
@@ -188,8 +193,8 @@ func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }

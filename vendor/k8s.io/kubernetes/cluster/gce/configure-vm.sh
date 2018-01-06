@@ -91,7 +91,7 @@ function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
   iptables -N KUBE-METADATA-SERVER
-  iptables -A FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+  iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
   if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
     iptables -A KUBE-METADATA-SERVER -j DROP
@@ -419,6 +419,9 @@ enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
 enable_node_problem_detector: '$(echo "$ENABLE_NODE_PROBLEM_DETECTOR" | sed -e "s/'/''/g")'
 enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
+enable_metadata_proxy: '$(echo "$ENABLE_METADATA_PROXY" | sed -e "s/'/''/g")'
+enable_metrics_server: '$(echo "$ENABLE_METRICS_SERVER" | sed -e "s/'/''/g")'
+enable_pod_security_policy: '$(echo "$ENABLE_POD_SECURITY_POLICY" | sed -e "s/'/''/g")'
 enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
@@ -445,8 +448,10 @@ kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
 initial_etcd_cluster_state: '$(echo "${INITIAL_ETCD_CLUSTER_STATE:-}" | sed -e "s/'/''/g")'
 ca_cert_bundle_path: '$(echo "${CA_CERT_BUNDLE_PATH:-}" | sed -e "s/'/''/g")'
-hostname: $(hostname -s)
+hostname: '$(echo "${ETCD_HOSTNAME:-$(hostname -s)}" | sed -e "s/'/''/g")'
+enable_pod_priority: '$(echo "${ENABLE_POD_PRIORITY:-}" | sed -e "s/'/''/g")'
 enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
+kube_proxy_daemonset: '$(echo "$KUBE_PROXY_DAEMONSET" | sed -e "s/'/''/g")'
 EOF
     if [ -n "${STORAGE_BACKEND:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
@@ -576,6 +581,11 @@ EOF
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${NODE_TAINTS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+node_taints: '$(echo "${NODE_TAINTS}" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${EVICTION_HARD:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
@@ -585,30 +595,17 @@ EOF
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/''/g")'
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [[ "${FEDERATION:-}" == "true" ]]; then
-      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-      fi
-      if [[ -n "${federations_domain_map}" ]]; then
-        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: '$(echo "- --federations=${federations_domain_map}" | sed -e "s/'/''/g")'
-EOF
-      else
-        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: ''
-EOF
-      fi
-    else
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: ''
+autoscaler_expander_config: '$(echo "${AUTOSCALER_EXPANDER_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ENABLE_IP_ALIASES:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_ip_aliases: '$(echo "$ENABLE_IP_ALIASES" | sed -e "s/'/''/g")'
 EOF
     fi
 }
@@ -634,7 +631,7 @@ function convert-bytes-gce-kube() {
 #    connect to the apiserver.
 
 function create-salt-kubelet-auth() {
-  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
@@ -649,7 +646,7 @@ users:
 clusters:
 - name: local
   cluster:
-    server: https://kubernetes-master
+    server: https://${KUBERNETES_MASTER_NAME}
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
@@ -664,14 +661,15 @@ EOF
 
 # This should happen both on cluster initialization and node upgrades.
 #
-#  - Uses the CA_CERT and KUBE_PROXY_TOKEN to generate a kubeconfig file for
-#    the kube-proxy to securely connect to the apiserver.
+#  - When run as static pods, use the CA_CERT and KUBE_PROXY_TOKEN to generate a
+#    kubeconfig file for the kube-proxy to securely connect to the apiserver.
+#  - When run as a daemonset, generate a kubeconfig file specific to service account.
 function create-salt-kubeproxy-auth() {
   local -r kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+  local kubeconfig_content=""
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
-    mkdir -p /srv/salt-overlay/salt/kube-proxy
-    (umask 077;
-        cat > "${kube_proxy_kubeconfig_file}" <<EOF
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+      kubeconfig_content="\
 apiVersion: v1
 kind: Config
 users:
@@ -687,7 +685,33 @@ contexts:
     cluster: local
     user: kube-proxy
   name: service-account-context
-current-context: service-account-context
+current-context: service-account-context"
+    else
+      # Generate kubeconfig specific to service account.
+      kubeconfig_content="\
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://${KUBERNETES_MASTER_NAME}
+  name: default
+contexts:
+- context:
+    cluster: default
+    namespace: default
+    user: default
+  name: default
+current-context: default
+users:
+- name: default
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token"
+    fi
+    mkdir -p /srv/salt-overlay/salt/kube-proxy
+    (umask 077;
+        cat > "${kube_proxy_kubeconfig_file}" <<EOF
+${kubeconfig_content}
 EOF
 )
   fi
@@ -765,12 +789,16 @@ EOF
 }
 
 function salt-node-role() {
+  local -r kubelet_bootstrap_kubeconfig="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
+  local -r kubelet_kubeconfig="/srv/salt-overlay/salt/kubelet/kubeconfig"
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
+  kubelet_bootstrap_kubeconfig: /var/lib/kubelet/bootstrap-kubeconfig
+  kubelet_kubeconfig: /var/lib/kubelet/kubeconfig
 EOF
 }
 
@@ -820,7 +848,7 @@ function run-salt() {
   echo "== Calling Salt =="
   local rc=0
   for i in {0..6}; do
-    salt-call --local state.highstate && rc=0 || rc=$?
+    salt-call --retcode-passthrough --local state.highstate && rc=0 || rc=$?
     if [[ "${rc}" == 0 ]]; then
       return 0
     fi

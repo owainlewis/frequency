@@ -19,13 +19,13 @@ package kubelet
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
 func TestNodeIPParam(t *testing.T) {
@@ -61,10 +61,10 @@ func TestNodeIPParam(t *testing.T) {
 	for _, test := range tests {
 		kubelet.nodeIP = net.ParseIP(test.nodeIP)
 		err := kubelet.validateNodeIP()
-		if err != nil && test.success {
-			t.Errorf("Test: %s, expected no error but got: %v", test.testName, err)
-		} else if err == nil && !test.success {
-			t.Errorf("Test: %s, expected an error", test.testName)
+		if test.success {
+			assert.NoError(t, err, "test %s", test.testName)
+		} else {
+			assert.Error(t, err, fmt.Sprintf("test %s", test.testName))
 		}
 	}
 }
@@ -90,6 +90,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}},
 		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}},
 		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}},
+		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}},
 		{"search foo", []string{}, []string{"foo"}},
 		{"search foo bar", []string{}, []string{"foo", "bar"}},
 		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}},
@@ -103,16 +104,9 @@ func TestParseResolvConf(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	for i, tc := range testCases {
 		ns, srch, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
-		if err != nil {
-			t.Errorf("expected success, got %v", err)
-			continue
-		}
-		if !reflect.DeepEqual(ns, tc.nameservers) {
-			t.Errorf("[%d] expected nameservers %#v, got %#v", i, tc.nameservers, ns)
-		}
-		if !reflect.DeepEqual(srch, tc.searches) {
-			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
-		}
+		require.NoError(t, err)
+		assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
+		assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
 	}
 }
 
@@ -124,7 +118,7 @@ func TestComposeDNSSearch(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	kubelet.recorder = recorder
 
-	pod := podWithUidNameNs("", "test_pod", "testNS")
+	pod := podWithUIDNameNs("", "test_pod", "testNS")
 	kubelet.clusterDomain = "TEST"
 
 	testCases := []struct {
@@ -144,10 +138,7 @@ func TestComposeDNSSearch(t *testing.T) {
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
 			[]string{"AAA", "svc.TEST", "BBB", "TEST"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
-			[]string{
-				"Found and omitted duplicated dns domain in host search line: 'svc.TEST' during merging with cluster dns domains",
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
-			},
+			[]string{},
 		},
 
 		{
@@ -162,8 +153,6 @@ func TestComposeDNSSearch(t *testing.T) {
 			[]string{"AAA", "TEST", "BBB", "TEST", "CCC", "DDD"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
 			[]string{
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
 				"Search Line limits were exceeded, some dns names have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC",
 			},
 		},
@@ -180,100 +169,11 @@ func TestComposeDNSSearch(t *testing.T) {
 
 	for i, tc := range testCases {
 		dnsSearch := kubelet.formDNSSearch(tc.hostNames, pod)
-
-		if !reflect.DeepEqual(dnsSearch, tc.resultSearch) {
-			t.Errorf("[%d] expected search line %#v, got %#v", i, tc.resultSearch, dnsSearch)
-		}
-
+		assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
 		for _, expectedEvent := range tc.events {
 			expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSSearchForming", expectedEvent)
 			event := fetchEvent(recorder)
-			if event != expected {
-				t.Errorf("[%d] expected event '%s', got '%s", i, expected, event)
-			}
-		}
-	}
-}
-
-func TestCleanupBandwidthLimits(t *testing.T) {
-	testPod := func(name, ingress string) *v1.Pod {
-		pod := podWithUidNameNs("", name, "")
-
-		if len(ingress) != 0 {
-			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingress
-		}
-
-		return pod
-	}
-
-	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
-	// layer status getter function and test that function instead.
-	tests := []struct {
-		status           *v1.PodStatus
-		pods             []*v1.Pod
-		inputCIDRs       []string
-		expectResetCIDRs []string
-		name             string
-	}{
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodRunning,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", "10M"),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			name:             "pod running",
-		},
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodFailed,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", "10M"),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "pod not running",
-		},
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodFailed,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", ""),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "no bandwidth limits",
-		},
-	}
-	for _, test := range tests {
-		shaper := &bandwidth.FakeShaper{
-			CIDRs: test.inputCIDRs,
-		}
-
-		testKube := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKube.Cleanup()
-		testKube.kubelet.shaper = shaper
-
-		for _, pod := range test.pods {
-			testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
-		}
-
-		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
-		if err != nil {
-			t.Errorf("unexpected error: %v (%s)", test.name, err)
-		}
-		if !reflect.DeepEqual(shaper.ResetCIDRs, test.expectResetCIDRs) {
-			t.Errorf("[%s]\nexpected: %v, saw: %v", test.name, test.expectResetCIDRs, shaper.ResetCIDRs)
+			assert.Equal(t, expected, event, "test [%d]", i)
 		}
 	}
 }
@@ -294,8 +194,6 @@ func TestGetIPTablesMark(t *testing.T) {
 	}
 	for _, tc := range tests {
 		res := getIPTablesMark(tc.bit)
-		if res != tc.expect {
-			t.Errorf("getIPTablesMark output unexpected result: %v when input bit is %d. Expect result: %v", res, tc.bit, tc.expect)
-		}
+		assert.Equal(t, tc.expect, res, "input %d", tc.bit)
 	}
 }

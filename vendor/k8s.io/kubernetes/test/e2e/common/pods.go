@@ -26,18 +26,20 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
@@ -103,7 +105,7 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		time.Sleep(time.Second)
 		pod, err := podClient.Get(podName, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
-		status, ok := v1.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
 		if !ok {
 			framework.Logf("getRestartDelay: status missing")
 			continue
@@ -159,7 +161,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -195,7 +197,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(framework.PodStartTimeout):
-			Fail("Timeout while waiting for pod creation")
+			framework.Failf("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
@@ -244,14 +246,14 @@ var _ = framework.KubeDescribe("Pods", func() {
 					deleted = true
 				case watch.Error:
 					framework.Logf("received a watch error: %v", event.Object)
-					Fail("watch closed with error")
+					framework.Failf("watch closed with error")
 				}
 			case <-timer:
-				Fail("timed out waiting for pod deletion")
+				framework.Failf("timed out waiting for pod deletion")
 			}
 		}
 		if !deleted {
-			Fail("Failed to observe pod deletion")
+			framework.Failf("Failed to observe pod deletion")
 		}
 
 		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
@@ -280,7 +282,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -329,7 +331,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -367,7 +369,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "srv",
-						Image: "gcr.io/google_containers/serve_hostname:v1.4",
+						Image: framework.ServeHostnameImage,
 						Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -415,7 +417,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -454,7 +456,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -524,7 +526,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
 					},
 				},
@@ -579,7 +581,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},
@@ -590,7 +592,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		By("updating the image")
 		podClient.Update(podName, func(pod *v1.Pod) {
-			pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
+			pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxSlim)
 		})
 
 		time.Sleep(syncLoopFrequency)
@@ -620,7 +622,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},

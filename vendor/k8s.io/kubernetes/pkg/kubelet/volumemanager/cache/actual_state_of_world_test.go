@@ -19,8 +19,8 @@ package cache
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -201,7 +201,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
@@ -260,7 +260,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	err = asw.AddPodToVolume(
@@ -325,7 +325,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act

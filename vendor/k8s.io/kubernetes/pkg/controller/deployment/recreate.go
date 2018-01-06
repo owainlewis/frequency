@@ -17,16 +17,16 @@ limitations under the License.
 package deployment
 
 import (
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
 func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) error {
-	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down
+	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down.
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, false)
 	if err != nil {
 		return err
@@ -34,13 +34,13 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 	allRSs := append(oldRSs, newRS)
 	activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)
 
-	// scale down old replica sets
+	// scale down old replica sets.
 	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(activeOldRSs, d)
 	if err != nil {
 		return err
 	}
 	if scaledDown {
-		// Update DeploymentStatus
+		// Update DeploymentStatus.
 		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
@@ -49,7 +49,7 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
-	// If we need to create a new RS, create it now
+	// If we need to create a new RS, create it now.
 	if newRS == nil {
 		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, true)
 		if err != nil {
@@ -63,11 +63,17 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 		return err
 	}
 
-	// Sync deployment status
+	if util.DeploymentComplete(d, &d.Status) {
+		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+			return err
+		}
+	}
+
+	// Sync deployment status.
 	return dc.syncRolloutStatus(allRSs, newRS, d)
 }
 
-// scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate"
+// scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate".
 func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*extensions.ReplicaSet, deployment *extensions.Deployment) (bool, error) {
 	scaled := false
 	for i := range oldRSs {
@@ -105,7 +111,7 @@ func oldPodsRunning(newRS *extensions.ReplicaSet, oldRSs []*extensions.ReplicaSe
 	return false
 }
 
-// scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate"
+// scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate".
 func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(newRS *extensions.ReplicaSet, deployment *extensions.Deployment) (bool, error) {
 	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, *(deployment.Spec.Replicas), deployment)
 	return scaled, err

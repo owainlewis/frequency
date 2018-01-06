@@ -92,19 +92,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *api.Registry.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:                      api.Scheme,
-		ParameterCodec:              api.ParameterCodec,
-		NegotiatedSerializer:        api.Codecs,
-		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{},
+		Scheme:               api.Scheme,
+		ParameterCodec:       api.ParameterCodec,
+		NegotiatedSerializer: api.Codecs,
 	}
-	if autoscalingGroupVersion := (schema.GroupVersion{Group: "autoscaling", Version: "v1"}); api.Registry.IsEnabledVersion(autoscalingGroupVersion) {
-		apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
-	}
-
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
 	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); api.Registry.IsEnabledVersion(policyGroupVersion) {
-		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
-
 		var err error
 		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
@@ -242,14 +235,14 @@ type componentStatusStorage struct {
 	storageFactory serverstorage.StorageFactory
 }
 
-func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
-	serversToValidate := map[string]componentstatus.Server{
+func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+	serversToValidate := map[string]*componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine)
+		etcdUrl, err := url.Parse(machine.Server)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
@@ -269,9 +262,10 @@ func (s componentStatusStorage) serversToValidate() map[string]componentstatus.S
 			port = 2379
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = componentstatus.Server{
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
 			Addr:        addr,
 			EnableHTTPS: etcdUrl.Scheme == "https",
+			TLSConfig:   machine.TLSConfig,
 			Port:        port,
 			Path:        "/health",
 			Validate:    etcdutil.EtcdHealthCheck,

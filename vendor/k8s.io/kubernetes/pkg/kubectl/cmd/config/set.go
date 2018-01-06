@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const (
@@ -60,10 +60,7 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 		Short: i18n.T("Sets an individual value in a kubeconfig file"),
 		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd) {
-				return
-			}
-
+			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
 			fmt.Fprintf(out, "Property %q set.\n", options.propertyName)
 		},
@@ -106,16 +103,16 @@ func (o setOptions) run() error {
 	return nil
 }
 
-func (o *setOptions) complete(cmd *cobra.Command) bool {
+func (o *setOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 2 {
 		cmd.Help()
-		return false
+		return fmt.Errorf("Unexpected args: %v", endingArgs)
 	}
 
 	o.propertyValue = endingArgs[1]
 	o.propertyName = endingArgs[0]
-	return true
+	return nil
 }
 
 func (o setOptions) validate() error {

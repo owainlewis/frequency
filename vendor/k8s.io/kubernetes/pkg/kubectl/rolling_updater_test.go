@@ -41,6 +41,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
 func oldRc(replicas int, original int) *api.ReplicationController {
@@ -1076,7 +1077,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 
 		codec := testapi.Default.Codec()
 
-		deploymentHash, err := api.HashObject(test.newRc, codec)
+		deploymentHash, err := util.HashObject(test.newRc, codec)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1467,7 +1468,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -1500,7 +1501,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 	clientset := internalclientset.New(restClient)
 
 	if rc, err := updateRcWithRetries(
-		clientset, "default", rc, func(c *api.ReplicationController) {
+		clientset.Core(), "default", rc, func(c *api.ReplicationController) {
 			c.Spec.Selector["baz"] = "foobar"
 		}); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1560,7 +1561,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
@@ -1654,7 +1655,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		oldPods []bool
 		newPods []bool
 		// deletions - should be less then the size of the respective slice above
-		// eg. len(oldPods) > oldPodDeletions && len(newPods) > newPodDeletions
+		// e.g. len(oldPods) > oldPodDeletions && len(newPods) > newPodDeletions
 		oldPodDeletions int
 		newPodDeletions int
 		// specify additional time to wait for deployment to wait on top of the

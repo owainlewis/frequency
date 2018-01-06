@@ -32,10 +32,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -72,6 +73,7 @@ func init() {
 
 func TestMain(m *testing.M) {
 	pflag.Parse()
+	framework.AfterReadingAllFlags(&framework.TestContext)
 	os.Exit(m.Run())
 }
 
@@ -229,7 +231,7 @@ func waitForNodeReady() {
 		if err != nil {
 			return fmt.Errorf("failed to get node: %v", err)
 		}
-		if !v1.IsNodeReady(node) {
+		if !nodeutil.IsNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
@@ -263,7 +265,7 @@ func updateTestContext() error {
 
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
-	nodes, err := c.Nodes().List(metav1.ListOptions{})
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")

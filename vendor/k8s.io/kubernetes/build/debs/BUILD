@@ -1,16 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
+load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
 # produce debs for them. We recommend that they be run in docker
 # images. We use the debs that we produce here to build those
 # images.
-filegroup(
+release_filegroup(
     name = "debs",
     srcs = [
+        ":cloud-controller-manager.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -28,11 +30,11 @@ filegroup(
         },
     ],
 ) for binary in [
+    "cloud-controller-manager",
     "kubectl",
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
-    "kube-aggregator",
 ]]
 
 deb_data(
@@ -85,25 +87,35 @@ pkg_tar(
 )
 
 k8s_deb(
+    name = "cloud-controller-manager",
+    description = "Kubernetes Cloud Controller Manager",
+    version_file = "//build:os_package_version",
+)
+
+k8s_deb(
     name = "kubectl",
     description = """Kubernetes Command Line Tool
 The Kubernetes command line tool for interacting with the Kubernetes API.
 """,
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
     name = "kube-apiserver",
     description = "Kubernetes API Server",
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
     name = "kube-controller-manager",
     description = "Kubernetes Controller Manager",
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
     name = "kube-scheduler",
     description = "Kubernetes Scheduler",
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
@@ -113,11 +125,7 @@ k8s_deb(
         "iproute2",
     ],
     description = "Kubernetes Service Proxy",
-)
-
-k8s_deb(
-    name = "kube-aggregator",
-    description = "Kubernetes Federated API Server",
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
@@ -135,6 +143,7 @@ k8s_deb(
     description = """Kubernetes Node Agent
 The node agent of Kubernetes, the container cluster manager
 """,
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
@@ -146,6 +155,7 @@ k8s_deb(
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
+    version_file = "//build:os_package_version",
 )
 
 k8s_deb(
@@ -153,6 +163,7 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
+    version_file = "//build:os_package_version",
 )
 
 filegroup(

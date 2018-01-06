@@ -22,21 +22,22 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	fakekubeclientset "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
+	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -160,8 +161,8 @@ func TestIngressController(t *testing.T) {
 	t.Log("Checking that appropriate finalizers are added")
 	// There should be an update to add both the finalizers.
 	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
-	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, metav1.FinalizerOrphanDependents), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
+	AssertHasFinalizer(t, updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters)
+	AssertHasFinalizer(t, updatedIngress, metav1.FinalizerOrphanDependents)
 	fedIngress = *updatedIngress
 
 	t.Log("Checking that Ingress was correctly created in cluster 1")
@@ -232,6 +233,7 @@ func TestIngressController(t *testing.T) {
 		fedIngress.ObjectMeta.Annotations = make(map[string]string)
 	}
 	fedIngress.ObjectMeta.Annotations["A"] = "B"
+	fedIngress.ObjectMeta.Annotations[federationapi.FederationClusterSelectorAnnotation] = `[{"key": "cluster", "operator": "in", "values": ["cluster1","cluster2"]}]`
 	t.Log("Modifying Federated Ingress")
 	fedIngressWatch.Modify(&fedIngress)
 	t.Log("Checking that Ingress was correctly updated in cluster 1")
@@ -333,8 +335,15 @@ func WaitForFinalizersInFederationStore(ingressController *IngressController, st
 			return false, err
 		}
 		ingress := obj.(*extensionsv1beta1.Ingress)
-		if ingressController.hasFinalizerFunc(ingress, metav1.FinalizerOrphanDependents) &&
-			ingressController.hasFinalizerFunc(ingress, deletionhelper.FinalizerDeleteFromUnderlyingClusters) {
+		hasOrphanFinalizer, err := finalizersutil.HasFinalizer(ingress, metav1.FinalizerOrphanDependents)
+		if err != nil {
+			return false, err
+		}
+		hasDeleteFinalizer, err := finalizersutil.HasFinalizer(ingress, deletionhelper.FinalizerDeleteFromUnderlyingClusters)
+		if err != nil {
+			return false, err
+		}
+		if hasOrphanFinalizer && hasDeleteFinalizer {
 			return true, nil
 		}
 		return false, nil

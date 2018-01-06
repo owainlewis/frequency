@@ -27,18 +27,19 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -48,14 +49,31 @@ type fakeVolumeHost struct {
 	pluginMgr  VolumePluginMgr
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
+	exec       mount.Exec
 	writer     io.Writer
+	nodeLabels map[string]string
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil}
+	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil)
+}
+
+func NewFakeVolumeHostWithCloudProvider(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
+	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud)
+}
+
+func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil)
+	volHost.nodeLabels = labels
+	return volHost
+}
+
+func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
-	host.pluginMgr.InitPlugins(plugins, host)
+	host.exec = mount.NewFakeExec(nil)
+	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	return host
 }
 
@@ -79,7 +97,7 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 	return f.cloud
 }
 
-func (f *fakeVolumeHost) GetMounter() mount.Interface {
+func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
 }
 
@@ -131,6 +149,23 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	return func(namespace, name string) (*v1.Secret, error) {
 		return f.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
 	}
+}
+
+func (f *fakeVolumeHost) GetExec(pluginName string) mount.Exec {
+	return f.exec
+}
+
+func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return f.kubeClient.Core().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	}
+}
+
+func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
+	if f.nodeLabels == nil {
+		f.nodeLabels = map[string]string{"test-label": "test-value"}
+	}
+	return f.nodeLabels, nil
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
@@ -391,7 +426,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
-	return "", nil
+	return "/dev/vdb-test", nil
 }
 
 func (fv *FakeVolume) GetAttachCallCount() int {
@@ -400,7 +435,7 @@ func (fv *FakeVolume) GetAttachCallCount() int {
 	return fv.AttachCallCount
 }
 
-func (fv *FakeVolume) WaitForAttach(spec *Spec, devicePath string, spectimeout time.Duration) (string, error) {
+func (fv *FakeVolume) WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.WaitForAttachCallCount++
@@ -485,7 +520,7 @@ func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "fakeplugin-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -733,7 +768,7 @@ func GetTestVolumePluginMgr(
 		nil, /* plugins */
 	)
 	plugins := ProbeVolumePlugins(VolumeConfig{})
-	if err := v.pluginMgr.InitPlugins(plugins, v); err != nil {
+	if err := v.pluginMgr.InitPlugins(plugins, nil /* prober */, v); err != nil {
 		t.Fatal(err)
 	}
 

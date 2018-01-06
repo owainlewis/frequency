@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,9 +12,8 @@ go_library(
         "doc.go",
         "register.go",
     ],
-    tags = ["automanaged"],
     deps = [
-        "//federation/apis/federation/install:go_default_library",
+        "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1/fake:go_default_library",
@@ -28,20 +25,18 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1/fake:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1/fake:go_default_library",
-        "//pkg/api/install:go_default_library",
-        "//pkg/apis/autoscaling/install:go_default_library",
-        "//pkg/apis/batch/install:go_default_library",
-        "//pkg/apis/extensions/install:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/discovery/fake",
-        "//vendor:k8s.io/client-go/testing",
+        "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
+        "//vendor/k8s.io/api/batch/v1:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/discovery:go_default_library",
+        "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

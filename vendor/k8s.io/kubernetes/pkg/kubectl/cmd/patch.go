@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge": types.MergePatchType, "strategic": types.StrategicMergePatchType}
@@ -56,14 +56,14 @@ type PatchOptions struct {
 }
 
 var (
-	patch_long = templates.LongDesc(`
+	patchLong = templates.LongDesc(i18n.T(`
 		Update field(s) of a resource using strategic merge patch
 
 		JSON and YAML formats are accepted.
 
-		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
+		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
 
-	patch_example = templates.Examples(`
+	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using strategic merge patch
 		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
@@ -74,7 +74,7 @@ var (
 		kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
 
 		# Update a container's image using a json patch with positional arrays
-		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`)
+		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
 )
 
 func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -94,8 +94,8 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
 		Short:   i18n.T("Update field(s) of a resource using strategic merge patch"),
-		Long:    patch_long,
-		Example: patch_example,
+		Long:    patchLong,
+		Example: patchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			options.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 			err := RunPatch(f, out, cmd, args, options)
@@ -136,24 +136,28 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		ok := false
 		patchType, ok = patchTypes[patchTypeString]
 		if !ok {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), patchTypeString))
+			return cmdutil.UsageErrorf(cmd, "--type must be one of %v, not %q",
+				sets.StringKeySet(patchTypes).List(), patchTypeString)
 		}
 	}
 
 	patch := cmdutil.GetFlagString(cmd, "patch")
 	if len(patch) == 0 {
-		return cmdutil.UsageError(cmd, "Must specify -p to patch")
+		return cmdutil.UsageErrorf(cmd, "Must specify -p to patch")
 	}
 	patchBytes, err := yaml.ToJSON([]byte(patch))
 	if err != nil {
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
+	// TODO: fix --local to work with customresources without making use of the discovery client.
+	// https://github.com/kubernetes/kubernetes/issues/46722
+	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+
+	r := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
@@ -220,6 +224,10 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
 				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 			}
+			mapper, _, err := f.UnstructuredObject()
+			if err != nil {
+				return err
+			}
 			cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 			return nil
 		}
@@ -230,14 +238,17 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err != nil {
 			return err
 		}
+
 		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, mapping.GroupVersionKind, api.Scheme)
 		if err != nil {
 			return err
 		}
+
 		targetObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalPatchedObjJS)
 		if err != nil {
 			return err
 		}
+
 		// TODO: if we ever want to go generic, this allows a clean -o yaml without trying to print columns or anything
 		// rawExtension := &runtime.Unknown{
 		//	Raw: originalPatchedObjJS,

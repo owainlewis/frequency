@@ -22,10 +22,10 @@ ifeq ($(ARCH),amd64)
 	BASEIMAGE?=bashell/alpine-bash
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armhf/debian
+	BASEIMAGE?=arm32v7/debian
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/debian
+	BASEIMAGE?=arm64v8/debian
 endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian
@@ -49,7 +49,7 @@ push: build
 	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
-	docker rmi $(IMAGE):$(VERSION) || true
+	docker rmi $(IMAGE):$(VERSION) 2>/dev/null || true
 	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
 	gcloud docker -- push $(IMAGE):$(VERSION)
 endif

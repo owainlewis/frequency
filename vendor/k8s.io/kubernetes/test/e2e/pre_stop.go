@@ -22,14 +22,12 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/kubernetes/pkg/api/v1"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -49,7 +47,7 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:  "server",
-					Image: "gcr.io/google_containers/nettest:1.7",
+					Image: imageutils.GetE2EImage(imageutils.Nettest),
 					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
@@ -82,7 +80,7 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:    "tester",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   imageutils.GetBusyBoxImage(),
 					Command: []string{"sleep", "600"},
 					Lifecycle: &v1.Lifecycle{
 						PreStop: &v1.Handler{
@@ -176,18 +174,6 @@ func testPreStop(c clientset.Interface, ns string) {
 
 var _ = framework.KubeDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
-
-	BeforeEach(func() {
-		// this test wants extra permissions.  Since the namespace names are unique, we can leave this
-		// lying around so we don't have to race any caches
-		framework.BindClusterRole(f.ClientSet.Rbac(), "cluster-admin", f.Namespace.Name,
-			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
-
-		err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
-			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
-			"", "create", schema.GroupResource{Resource: "pods"}, true)
-		framework.ExpectNoError(err)
-	})
 
 	It("should call prestop when killing a pod [Conformance]", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)

@@ -50,6 +50,7 @@ type PortMapping struct {
 // CheckpointData contains all types of data that can be stored in the checkpoint.
 type CheckpointData struct {
 	PortMappings []*PortMapping `json:"port_mappings,omitempty"`
+	HostNetwork  bool           `json:"host_network,omitempty"`
 }
 
 // PodSandboxCheckpoint is the checkpoint structure for a sandbox
@@ -84,7 +85,7 @@ type PersistentCheckpointHandler struct {
 	store CheckpointStore
 }
 
-func NewPersistentCheckpointHandler() (CheckpointHandler, error) {
+func NewPersistentCheckpointHandler(dockershimRootDir string) (CheckpointHandler, error) {
 	fstore, err := NewFileStore(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
 	if err != nil {
 		return nil, err

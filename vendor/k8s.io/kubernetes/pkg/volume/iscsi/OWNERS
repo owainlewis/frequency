@@ -5,10 +5,8 @@ approvers:
 reviewers:
 - thockin
 - smarterclayton
-- deads2k
 - brendandburns
 - derekwaynecarr
-- bprashanth
 - pmorie
 - saad-ali
 - justinsb
@@ -16,5 +14,5 @@ reviewers:
 - rootfs
 - humblec
 - jingxu97
-- rkouj
 - msau42
+- mtanino 

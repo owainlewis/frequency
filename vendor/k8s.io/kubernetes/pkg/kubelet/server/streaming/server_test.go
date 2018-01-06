@@ -30,13 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/transport/spdy"
+	"k8s.io/kubernetes/pkg/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	kubeletremotecommand "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 const (
@@ -238,9 +237,10 @@ func TestServePortForward(t *testing.T) {
 	reqURL, err := url.Parse(resp.Url)
 	require.NoError(t, err)
 
-	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", reqURL)
+	transport, upgrader, err := spdy.RoundTripperFor(&restclient.Config{})
 	require.NoError(t, err)
-	streamConn, _, err := exec.Dial(kubeletportforward.ProtocolV1Name)
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", reqURL)
+	streamConn, _, err := dialer.Dial(kubeletportforward.ProtocolV1Name)
 	require.NoError(t, err)
 	defer streamConn.Close()
 
@@ -298,16 +298,14 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 
 	go func() {
 		defer wg.Done()
-		exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", reqURL)
+		exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", reqURL)
 		require.NoError(t, err)
 
 		opts := remotecommand.StreamOptions{
-			SupportedProtocols: kubeletremotecommand.SupportedStreamingProtocols,
-			Stdin:              stdinR,
-			Stdout:             stdoutW,
-			Stderr:             stderrW,
-			Tty:                false,
-			TerminalSizeQueue:  nil,
+			Stdin:  stdinR,
+			Stdout: stdoutW,
+			Stderr: stderrW,
+			Tty:    false,
 		}
 		require.NoError(t, exec.Stream(opts))
 	}()
@@ -367,13 +365,13 @@ type fakeRuntime struct {
 	t *testing.T
 }
 
-func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "exec", stdin, stdout, stderr)
 	return nil
 }
 
-func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "attach", stdin, stdout, stderr)
 	return nil

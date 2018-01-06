@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -9,18 +7,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "deletion_helper.go",
-        "util.go",
-    ],
-    tags = ["automanaged"],
+    srcs = ["deletion_helper.go"],
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/api:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/tools/record",
+        "//federation/pkg/federation-controller/util/finalizers:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

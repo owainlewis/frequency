@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -25,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,13 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -63,24 +62,26 @@ func TestQuota(t *testing.T) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
 
 	admissionCh := make(chan struct{})
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 	config := &resourcequotaapi.Configuration{}
-	admission, err := resourcequota.NewResourceQuota(quotainstall.NewRegistry(nil, nil), config, 5, admissionCh)
+	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
 	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
+	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	admission.(kubeadmission.WantsQuotaRegistry).SetQuotaRegistry(quotaRegistry)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quotaed", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -105,7 +106,7 @@ func TestQuota(t *testing.T) {
 		api.Kind("Pod"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:                clientset,
+		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,
@@ -239,11 +240,10 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
 
 	admissionCh := make(chan struct{})
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 
 	// stop creation of a pod resource unless there is a quota
 	config := &resourcequotaapi.Configuration{
@@ -254,18 +254,21 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 			},
 		},
 	}
-	admission, err := resourcequota.NewResourceQuota(quotainstall.NewRegistry(nil, nil), config, 5, admissionCh)
+	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
 	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
+	admission.(kubeadmission.WantsQuotaRegistry).SetQuotaRegistry(quotaRegistry)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quota", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -288,7 +291,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		api.Kind("Pod"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:                clientset,
+		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,

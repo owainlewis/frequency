@@ -42,11 +42,11 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage/value"
 
 	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 var (
@@ -61,12 +61,12 @@ func init() {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pod, ok := obj.(*example.Pod)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
+		return nil, nil, false, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
 }
 
 // PodToSelectableFields returns a field set that represents the object
@@ -93,7 +93,7 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
 	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
-	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, etcd3.IdentityTransformer)
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, value.IdentityTransformer, true)
 	return server, storage
 }
 
@@ -123,12 +123,7 @@ func makeTestPod(name string) *example.Pod {
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := scheme.DeepCopy(obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return nil, nil, err
-		}
-		return newObj.(*example.Pod), nil, nil
+		return obj.DeepCopyObject(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
 	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
@@ -469,12 +464,12 @@ func TestFiltering(t *testing.T) {
 	pred := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(labels.Set{"filter": "foo"}),
 		Field: fields.Everything(),
-		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error) {
 			metadata, err := meta.Accessor(obj)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			return labels.Set(metadata.GetLabels()), nil, nil
+			return labels.Set(metadata.GetLabels()), nil, metadata.GetInitializers() != nil, nil
 		},
 	}
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, pred)

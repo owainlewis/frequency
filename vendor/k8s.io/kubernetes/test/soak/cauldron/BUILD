@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,21 +9,20 @@ load(
 go_binary(
     name = "cauldron",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["cauldron.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
-        "//vendor:k8s.io/client-go/rest",
+        "//test/e2e/framework:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

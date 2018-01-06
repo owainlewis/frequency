@@ -22,13 +22,15 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // SecretUpgradeTest tests that a pod with sysctls runs before and after an upgrade. During
@@ -123,14 +125,14 @@ func sysctlTestPod(name string, sysctls map[string]string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SysctlsPodAnnotationKey: v1.PodAnnotationsFromSysctls(sysctlList),
+				v1.SysctlsPodAnnotationKey: v1helper.PodAnnotationsFromSysctls(sysctlList),
 			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
 					Name:    "test-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   imageutils.GetBusyBoxImage(),
 					Command: append([]string{"/bin/sysctl"}, keys...),
 				},
 			},

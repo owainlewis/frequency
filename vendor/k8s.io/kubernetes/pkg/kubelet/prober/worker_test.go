@@ -21,19 +21,19 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
 )
 
 func init() {
@@ -118,7 +118,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil, nil), &statustest.FakePodDeletionSafetyProvider{})
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil, nil, nil), &statustest.FakePodDeletionSafetyProvider{})
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}

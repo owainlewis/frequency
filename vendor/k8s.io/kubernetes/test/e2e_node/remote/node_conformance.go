@@ -228,7 +228,7 @@ func stopKubelet(host, workspace string) error {
 	glog.Info("Wait for kubelet launcher to stop")
 	stopped := false
 	for start := time.Now(); time.Since(start) < kubeletStopGracePeriod; time.Sleep(time.Second) {
-		// Check whehther the process is still running.
+		// Check whether the process is still running.
 		output, err := SSH(host, "pidof", conformanceTestBinary, "||", "true")
 		if err != nil {
 			return fmt.Errorf("failed to check kubelet stopping: error - %v output -%q",
@@ -258,9 +258,9 @@ func stopKubelet(host, workspace string) error {
 }
 
 // RunTest runs test on the node.
-func (c *ConformanceRemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, _ string, systemSpecName string, timeout time.Duration) (string, error) {
-	// Install the cni plugin.
-	if err := installCNI(host, workspace); err != nil {
+func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName string, timeout time.Duration) (string, error) {
+	// Install the cni plugins and add a basic CNI configuration.
+	if err := setupCNI(host, workspace); err != nil {
 		return "", err
 	}
 

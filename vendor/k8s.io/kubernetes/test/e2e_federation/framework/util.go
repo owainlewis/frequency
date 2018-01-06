@@ -28,22 +28,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+const FederatedDefaultTestTimeout = 5 * time.Minute
+
 // Detects whether the federation namespace exists in the underlying cluster
 func SkipUnlessFederated(c clientset.Interface) {
-	federationNS := os.Getenv("FEDERATION_NAMESPACE")
-	if federationNS == "" {
-		federationNS = federationapi.FederationNamespaceSystem
-	}
+	federationNS := framework.FederationSystemNamespace()
 
 	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
 	if err != nil {
@@ -67,12 +65,7 @@ func WaitForFederationApiserverReady(c *federation_clientset.Clientset) error {
 	})
 }
 
-func LoadFederationClientset() (*federation_clientset.Clientset, error) {
-	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
-	if err != nil {
-		return nil, err
-	}
-
+func LoadFederationClientset(config *restclient.Config) (*federation_clientset.Clientset, error) {
 	c, err := federation_clientset.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
@@ -85,7 +78,7 @@ func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Conf
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation client config: %v", err.Error())
 	}
-	cfg, err := clientcmd.NewDefaultClientConfig(*c, overrides).ClientConfig()
+	cfg, err := clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if cfg != nil {
 		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
 		cfg.NegotiatedSerializer = api.Codecs

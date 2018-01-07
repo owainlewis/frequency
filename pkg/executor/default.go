@@ -13,12 +13,12 @@ const shell = "/bin/bash"
 
 // Executor controls how jobs are executed inside Kubernetes
 type Executor struct {
-	clientset kubernetes.Interface
+	Client kubernetes.Interface
 }
 
 // NewExecutor creates a properly configured Job Executor
 func NewExecutor(clientset kubernetes.Interface) Executor {
-	return Executor{clientset: clientset}
+	return Executor{Client: clientset}
 }
 
 // Execute will execute a single job
@@ -30,7 +30,8 @@ func (e Executor) Execute(job *types.Job) error {
 	template := e.NewPod(job.Workspace, job.Image, job.Commands)
 
 	// TODO which namespace to run in (must be configurable)
-	pod, err := e.clientset.CoreV1().Pods(v1.NamespaceDefault).Create(template)
+
+	pod, err := e.Client.CoreV1().Pods(v1.NamespaceDefault).Create(template)
 	glog.Infof("Created pod %s for execution", pod.Name)
 
 	return err

@@ -4,10 +4,10 @@ package types
 // It represents the execution of a Kubernetes pod with a series of
 // commands specified by the user as part of the kcd.yml manifest file.
 type Job struct {
-	Name      string
-	Workspace string
-	Image     string
-	Commands  []string
+	Name      string   `json:"name,omitempty"`
+	Workspace string   `json:"workspace,omitempty"`
+	Image     string   `json:"image,omitempty"`
+	Commands  []string `json:"commands,omitempty"`
 }
 
 func (job *Job) EnsureDefaults() {

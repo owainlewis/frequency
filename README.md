@@ -22,6 +22,27 @@ jobs:
       - mv main {{ .Values.OutputDirectory }}
 ```
 
+## API
+
+### Jobs
+
+Invoke a job execution
+
+`POST /api/v1/jobs`
+
+```json
+{
+   "name":"hello-kcd",
+   "workspace":"/workspace",
+   "image":"golang",
+   "commands":[
+      "go build -v main.go",
+      "mv ./main $OUTPUT_DIR",
+      "ls $OUTPUT_DIR"
+   ]
+}
+```
+
 ## Domain Language
 
 Terminology reference.

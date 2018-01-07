@@ -2,13 +2,15 @@ package main
 
 import (
 	"flag"
+	"log"
 	"net/http"
 
 	"github.com/golang/glog"
+	"github.com/gorilla/mux"
+	"github.com/owainlewis/kcd/api"
 	builder "github.com/owainlewis/kcd/pkg/client"
 	"github.com/owainlewis/kcd/pkg/controller"
 	"github.com/owainlewis/kcd/pkg/executor"
-	"github.com/owainlewis/kcd/pkg/types"
 )
 
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
@@ -29,23 +31,15 @@ func main() {
 	defer close(stop)
 	go ctrl.Run(1, stop)
 
+	router := mux.NewRouter()
+
 	exec := executor.NewExecutor(client)
 
-	job := types.Job{
-		Name:  "hello-kcd",
-		Image: "golang",
-		Commands: []string{
-			"go build -v main.go",
-			"mv ./main $OUTPUT_DIR",
-			"ls $OUTPUT_DIR",
-		},
-	}
+	apiHandler := api.New(exec)
 
-	err = exec.Execute(&job)
-	if err != nil {
-		glog.Errorf("Execution failed: %s", err.Error())
-	}
+	router.HandleFunc("/api/v1/jobs", apiHandler.CreateJob).Methods("POST")
 
-	http.Handle("/", http.FileServer(http.Dir("./ui/src")))
+	log.Fatal(http.ListenAndServe(":3000", router))
+
 	http.ListenAndServe(":3000", nil)
 }

@@ -7,9 +7,8 @@ import (
 	"github.com/golang/glog"
 	builder "github.com/owainlewis/kcd/pkg/client"
 	"github.com/owainlewis/kcd/pkg/controller"
+	"github.com/owainlewis/kcd/pkg/executor"
 	"github.com/owainlewis/kcd/pkg/types"
-
-	executor "github.com/owainlewis/kcd/pkg/executor"
 )
 
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
@@ -42,7 +41,7 @@ func main() {
 		},
 	}
 
-	err = exec.Execute("default", job)
+	err = exec.Execute(&job)
 	if err != nil {
 		glog.Errorf("Execution failed: %s", err.Error())
 	}

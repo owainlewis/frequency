@@ -43,6 +43,18 @@ Invoke a job execution
 }
 ```
 
+```
+➜  ~ curl -iX POST localhost:3000/api/v1/jobs -d '{"name":"api-example","workspace":"/workspace","image":"golang","commands":["echo \"BOOM\""]}'
+HTTP/1.1 202 Accepted
+Date: Sun, 07 Jan 2018 15:40:28 GMT
+Content-Length: 108
+Content-Type: text/plain; charset=utf-8
+
+{"name":"api-example","workspace":"/workspace","image":"golang","commands":["echo \"BOOM\""],"source":null}
+➜  ~ kubectl logs kcd-x00zv
+BOOM
+```
+
 ## Domain Language
 
 Terminology reference.

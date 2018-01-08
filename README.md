@@ -71,6 +71,10 @@ The smallest unit of execution in KCD. A stage is the execution of some commands
 
 A job is executed within a context. This means that a job executes with some metadata about the branch etc
 
+### Build
+
+A build has a message, commit and hash and checks out code from VCS and then executes a job based on the contents of a config.yml file.
+
 ### Workflow
 
 A workflow describes a series of jobs to be run in a specific order.

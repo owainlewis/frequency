@@ -16,11 +16,13 @@ func (api Api) CreateJob(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
-	err = api.Executor.Execute(&job)
+	pod, err := api.Executor.Execute(&job)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
 		return
 	}
+
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(&job)
+	json.NewEncoder(w).Encode(&pod)
 }

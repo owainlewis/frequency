@@ -22,7 +22,7 @@ func NewExecutor(clientset kubernetes.Interface) Executor {
 }
 
 // Execute will execute a single job
-func (e Executor) Execute(job *types.Job) error {
+func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
 
 	job.EnsureDefaults()
 
@@ -30,11 +30,13 @@ func (e Executor) Execute(job *types.Job) error {
 	template := e.NewPod(job.Workspace, job.Image, job.Commands)
 
 	// TODO which namespace to run in (must be configurable)
-
 	pod, err := e.Client.CoreV1().Pods(v1.NamespaceDefault).Create(template)
-	glog.Infof("Created pod %s for execution", pod.Name)
+	if err != nil {
+		glog.Infof("Failed to create pod")
+		return nil, err
+	}
 
-	return err
+	return pod, nil
 }
 
 // FormatCommands will format the commands passed for execution in a shell

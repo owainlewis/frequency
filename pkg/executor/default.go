@@ -8,7 +8,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 )
 
-// Should be configurable
+// Should be configurable (part of the job?)
 const shell = "/bin/bash"
 
 // Executor controls how jobs are executed inside Kubernetes
@@ -23,11 +23,10 @@ func NewExecutor(clientset kubernetes.Interface) Executor {
 
 // Execute will execute a single job
 func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
-
 	job.EnsureDefaults()
 
-	glog.Infof("Executing job: ", job.Name)
-	template := e.NewPod(job.Workspace, job.Image, job.Commands)
+	glog.Infof("Executing job: %s", job.Name)
+	template := e.NewJobExecutionPod(job)
 
 	// TODO which namespace to run in (must be configurable)
 	pod, err := e.Client.CoreV1().Pods(v1.NamespaceDefault).Create(template)
@@ -39,44 +38,54 @@ func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// FormatCommands will format the commands passed for execution in a shell
+// FormatSteps will format the steps passed for execution in a shell
 // Hacky way to do this. TODO can we refine here?
-func (e Executor) FormatCommands(commands []string) []string {
-	cmdStr := ""
-	for _, c := range commands {
-		cmdStr = cmdStr + c + ";"
+func (e Executor) FormatSteps(steps []string) []string {
+	stepsStr := ""
+	for _, c := range steps {
+		stepsStr = stepsStr + c + ";"
 	}
 
-	return []string{shell, "-c", cmdStr}
+	return []string{shell, "-c", stepsStr}
 }
 
-// NewPod will construct the pod template to be created to run a job
-func (e Executor) NewPod(workspace string, image string, commands []string) *v1.Pod {
+func env(k, v string) v1.EnvVar {
+	return v1.EnvVar{Name: k, Value: v}
+}
+
+// NewJobExecutionPod will construct the pod template in which a job will run
+//
+// The pod has two primary roles
+//
+// 1. A sidecar container will check out the project from Git
+// 2. A primary pod is created with the correct shared directories and env
+//
+//
+func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 	defaultEnv := []v1.EnvVar{
-		{
-			Name:  "WORKSPACE",
-			Value: workspace,
-		},
-		{
-			Name:  "OUTPUT_DIR",
-			Value: "/output",
-		},
+		env("WORKSPACE", job.Workspace),
+		env("OUTPUT_DIR", "/output"),
 	}
 	primary := v1.Container{
 		Name:       "primary",
-		Image:      image,
-		WorkingDir: workspace,
+		Image:      job.Image,
+		WorkingDir: job.Workspace,
 		Env:        defaultEnv,
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      "workspace",
-				MountPath: workspace,
+				MountPath: job.Workspace,
 			},
 			{
 				Name:      "output",
 				MountPath: "/output",
 			}},
-		Command: e.FormatCommands(commands),
+		Command: e.FormatSteps(job.Steps),
+	}
+
+	buildEnv := []v1.EnvVar{
+		env("GIT_PROJECT", "https://github.com/owainlewis/sample-project.git"),
+		env("GIT_BRANCH", "master"),
 	}
 
 	pod := &v1.Pod{
@@ -90,13 +99,13 @@ func (e Executor) NewPod(workspace string, image string, commands []string) *v1.
 			InitContainers: []v1.Container{{
 				Name:  "setup",
 				Image: "alpine/git",
-				Env:   defaultEnv,
+				Env:   append(defaultEnv, buildEnv...),
 				VolumeMounts: []v1.VolumeMount{{
 					Name:      "workspace",
-					MountPath: workspace,
+					MountPath: job.Workspace,
 				}},
 				Command: []string{
-					"ash", "-c", "git clone https://github.com/owainlewis/hello-spinnaker.git $WORKSPACE",
+					"ash", "-c", "git clone -b $GIT_BRANCH $GIT_PROJECT $WORKSPACE",
 				},
 			}},
 			RestartPolicy: v1.RestartPolicyNever,

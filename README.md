@@ -15,7 +15,8 @@ jobs:
     image: golang
     workspace: /go/src/github.com/owainlewis/kcd
     environment:
-      - FOO=bar
+      DOCKER_USERNAME: xxx
+      DOCKER_PASSWORD: xxx
     command: 
       cmd: ./ci/build.sh
       args: []
@@ -34,11 +35,10 @@ Invoke a job execution
    "name":"hello-kcd",
    "workspace":"/workspace",
    "image":"golang",
-   "commands":[
-      "go build -v main.go",
-      "mv ./main $OUTPUT_DIR",
-      "ls $OUTPUT_DIR"
-   ]
+   "command": {
+      "cmd": "echo",
+      "args": ["Hello, World!"]
+   }
 }
 ```
 

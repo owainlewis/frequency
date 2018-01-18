@@ -16,10 +16,9 @@ jobs:
     workspace: /go/src/github.com/owainlewis/kcd
     environment:
       - FOO=bar
-    steps:
-      - echo "Running tests..."
-      - go build main.go
-      - mv main {{ .Values.OutputDirectory }}
+    command: 
+      cmd: ./ci/build.sh
+      args: []
 ```
 
 ## API

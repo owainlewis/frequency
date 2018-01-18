@@ -8,8 +8,10 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 )
 
-// Should be configurable (part of the job?)
-const shell = "/bin/bash"
+// outputDir is the location that build assets are moved to
+// typically this will be a shared Kubernetes volume so that
+// assets can be shared between jobs
+const outputDir = "/output"
 
 // Executor controls how jobs are executed inside Kubernetes
 type Executor struct {
@@ -23,8 +25,6 @@ func NewExecutor(clientset kubernetes.Interface) Executor {
 
 // Execute will execute a single job
 func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
-	job.EnsureDefaults()
-
 	glog.Infof("Executing job: %s", job.Name)
 	template := e.NewJobExecutionPod(job)
 
@@ -38,17 +38,6 @@ func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// FormatSteps will format the steps passed for execution in a shell
-// Hacky way to do this. TODO can we refine here?
-func (e Executor) FormatSteps(steps []string) []string {
-	stepsStr := ""
-	for _, c := range steps {
-		stepsStr = stepsStr + c + ";"
-	}
-
-	return []string{shell, "-c", stepsStr}
-}
-
 func env(k, v string) v1.EnvVar {
 	return v1.EnvVar{Name: k, Value: v}
 }
@@ -57,14 +46,13 @@ func env(k, v string) v1.EnvVar {
 //
 // The pod has two primary roles
 //
-// 1. A sidecar container will check out the project from Git
-// 2. A primary pod is created with the correct shared directories and env
-//
+// 1. A sidecar container will check out the project from a VCS
+// 2. A primary pod is created with the correct shared directories and environment
 //
 func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 	defaultEnv := []v1.EnvVar{
 		env("WORKSPACE", job.Workspace),
-		env("OUTPUT_DIR", "/output"),
+		env("OUTPUT_DIR", outputDir),
 	}
 	primary := v1.Container{
 		Name:       "primary",
@@ -78,11 +66,12 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 			},
 			{
 				Name:      "output",
-				MountPath: "/output",
+				MountPath: outputDir,
 			}},
-		Command: e.FormatSteps(job.Steps),
+		Command: append([]string{job.Command.Cmd}, job.Command.Args...),
 	}
 
+	// TODO structurally where does this get injected?
 	buildEnv := []v1.EnvVar{
 		env("GIT_PROJECT", "https://github.com/owainlewis/sample-project.git"),
 		env("GIT_BRANCH", "master"),

@@ -65,15 +65,11 @@ A project is typically a software project that lives in version control and cont
 
 ### Job
 
-The smallest unit of execution in KCD. A stage is the execution of some commands inside a base image.
-
-#### Context
-
-A job is executed within a context. This means that a job executes with some metadata about the branch etc
+A job is a template describing the execution steps inside in KCD.
 
 ### Build
 
-A build has a message, commit and hash and checks out code from VCS and then executes a job based on the contents of a config.yml file.
+A build is an invokation of a job.
 
 ### Workflow
 

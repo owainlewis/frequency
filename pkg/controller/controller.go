@@ -28,24 +28,24 @@ func NewController(clientset kubernetes.Interface) *Controller {
 	// create the workqueue
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	indexer, informer := cache.NewIndexerInformer(podListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				queue.Add(key)
-			}
-		},
+		// AddFunc: func(obj interface{}) {
+		// 	key, err := cache.MetaNamespaceKeyFunc(obj)
+		// 	if err == nil {
+		// 		queue.Add(key)
+		// 	}
+		// },
 		UpdateFunc: func(old interface{}, new interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(new)
 			if err == nil {
 				queue.Add(key)
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				queue.Add(key)
-			}
-		},
+		// DeleteFunc: func(obj interface{}) {
+		// 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+		// 	if err == nil {
+		// 		queue.Add(key)
+		// 	}
+		// },
 	}, cache.Indexers{})
 
 	return &Controller{

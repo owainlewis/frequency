@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/golang/glog"
 	"github.com/owainlewis/kcd/pkg/types"
 )
 
@@ -24,6 +25,14 @@ func (api Api) CreateJob(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
+
+	pid := pod.GetUID()
+
+	job.ID = string(pid)
+
+	glog.Infof("Saving job %v", job)
+
+	// Write job to database and set the pod ID as the
 
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(&pod)

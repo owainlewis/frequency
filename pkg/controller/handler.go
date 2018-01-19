@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"strings"
-
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 )
@@ -11,13 +9,15 @@ import (
 // This will have information about the state of the pod lifecycle which can be
 // pushed back to the upstream API server
 func (c *Controller) podUpdateHandler(pod *v1.Pod) {
-	// TODO (remove me)
-	if strings.HasPrefix(pod.Name, "kcd-") {
-		glog.Infof("Pod %s is in phase %s", pod.GetName(), pod.Status.Phase)
 
-		// Update the status of the job in the API
+	pid := pod.GetUID()
 
-		// LOGS
+	glog.Infof("Pod %s %s is in phase %s", pid, pod.GetName(), pod.Status.Phase)
 
-	}
+	// Get the job where ID == pid and update the status
+
+	// Update the status of the job in the API
+
+	// LOGS
+
 }

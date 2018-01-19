@@ -10,6 +10,9 @@ type Command struct {
 // It represents the execution of a Kubernetes pod with a series of
 // commands specified by the user as part of the kcd.yml manifest file.
 type Job struct {
+	// ID is the UID of the pod created for this job and gets assigned
+	// after a job has been submitted to Kubernetes
+	ID          string            `json:"id"`
 	Name        string            `json:"name"`
 	Image       string            `json:"image"`
 	Workspace   string            `json:"workspace"`

@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/owainlewis/kcd/pkg/persistence"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/owainlewis/kcd/api"
@@ -42,14 +45,20 @@ func main() {
 	defer close(stop)
 	go ctrl.Run(1, stop)
 
-	apiHandler := api.New(executor.NewExecutor(client))
+	API := buildAPI(client)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/jobs", apiHandler.CreateJob).Methods("POST")
+	router.HandleFunc("/api/v1/jobs", API.CreateJob).Methods("POST")
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
 
 	glog.Info("Starting API server...")
 	glog.Info(banner)
 
 	log.Fatal(http.ListenAndServe(":3000", router))
+}
+
+func buildAPI(client kubernetes.Interface) api.Api {
+	ex := executor.NewExecutor(client)
+	db := persistence.InMemoryStore{}
+	return api.New(ex, db)
 }

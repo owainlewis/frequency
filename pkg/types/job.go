@@ -2,8 +2,8 @@ package types
 
 // Command describes the command to run inside a Pod container
 type Command struct {
-	Cmd  string
-	Args []string
+	Cmd  string   `json:"cmd"`
+	Args []string `json:"args"`
 }
 
 // Job is the smallest unit of execution in KCD.

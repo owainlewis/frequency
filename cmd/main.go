@@ -15,6 +15,17 @@ import (
 
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
 
+var banner = `
+
+|\  \     |\  \|\   __  \|\  \    /  /|\  ___ \
+\ \  \    \ \  \ \  \|\  \ \  \  /  / | \   __/|
+ \ \  \  __\ \  \ \   __  \ \  \/  / / \ \  \_|/__
+  \ \  \|\__\_\  \ \  \ \  \ \    / /   \ \  \_|\ \
+   \ \____________\ \__\ \__\ \__/ /     \ \_______\
+    \|____________|\|__|\|__|\|__|/       \|_______|
+
+`
+
 func main() {
 
 	flag.Parse()
@@ -31,15 +42,14 @@ func main() {
 	defer close(stop)
 	go ctrl.Run(1, stop)
 
+	apiHandler := api.New(executor.NewExecutor(client))
+
 	router := mux.NewRouter()
-
-	exec := executor.NewExecutor(client)
-
-	apiHandler := api.New(exec)
-
 	router.HandleFunc("/api/v1/jobs", apiHandler.CreateJob).Methods("POST")
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
+
+	glog.Info("Starting API server...")
+	glog.Info(banner)
 
 	log.Fatal(http.ListenAndServe(":3000", router))
-
-	http.ListenAndServe(":3000", nil)
 }

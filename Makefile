@@ -10,6 +10,10 @@ clean:
 test:
 	@go test ./...
 
+.PHONY: job
+job:
+	@curl -iX POST localhost:3000/api/v1/jobs --data-binary "@examples/job.json"
+
 .PHONY: run
 run:
 	@go run cmd/main.go \

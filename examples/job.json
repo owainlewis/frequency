@@ -1,0 +1,14 @@
+{
+    "name":"api-example",
+    "workspace":"/workspace",
+    "environment": {
+        "FOO": "bar"
+    },
+    "image":"golang",
+    "command":{
+       "cmd":"ls",
+       "args":[
+          "-la"
+       ]
+    }
+ }

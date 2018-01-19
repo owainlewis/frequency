@@ -7,7 +7,7 @@ import (
 	"github.com/owainlewis/kcd/pkg/types"
 )
 
-// CreateJob is a HTTP handler invoked to trigger the execution of a job
+// CreateJob is a HTTP handler invoked to trigger the execution of a single job
 func (api Api) CreateJob(w http.ResponseWriter, r *http.Request) {
 	var job types.Job
 

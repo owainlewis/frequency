@@ -18,6 +18,7 @@ type Job struct {
 	Workspace   string            `json:"workspace"`
 	Environment map[string]string `json:"environment"`
 	Command     Command           `json:"command"`
+	Source      *Source           `json:"source"`
 }
 
 // EnsureDefaults will set default values on a job

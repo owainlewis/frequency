@@ -71,10 +71,29 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 		Command: append([]string{job.Command.Cmd}, job.Command.Args...),
 	}
 
-	// TODO structurally where does this get injected?
-	buildEnv := []v1.EnvVar{
-		env("GIT_PROJECT", "https://github.com/owainlewis/sample-project.git"),
-		env("GIT_BRANCH", "master"),
+	// When a source is declared as part of a job, we use an init container
+	// to go and fetch that source code from a VCS such as github.com
+	var initContainers []v1.Container
+	if job.Source != nil {
+
+		buildEnv := []v1.EnvVar{
+			env("GIT_URL", job.Source.GitURL),
+			env("GIT_BRANCH", job.Source.GitBranch),
+		}
+
+		sourceCloneContainer := v1.Container{
+			Name:  "setup",
+			Image: "alpine/git",
+			Env:   append(defaultEnv, buildEnv...),
+			VolumeMounts: []v1.VolumeMount{{
+				Name:      "workspace",
+				MountPath: job.Workspace,
+			}},
+			Command: []string{
+				"ash", "-c", "git clone -b + " + job.Source.GitURL + " $WORKSPACE",
+			}}
+
+		initContainers = append(initContainers, sourceCloneContainer)
 	}
 
 	pod := &v1.Pod{
@@ -84,20 +103,9 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 			},
 		},
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{primary},
-			InitContainers: []v1.Container{{
-				Name:  "setup",
-				Image: "alpine/git",
-				Env:   append(defaultEnv, buildEnv...),
-				VolumeMounts: []v1.VolumeMount{{
-					Name:      "workspace",
-					MountPath: job.Workspace,
-				}},
-				Command: []string{
-					"ash", "-c", "git clone -b $GIT_BRANCH $GIT_PROJECT $WORKSPACE",
-				},
-			}},
-			RestartPolicy: v1.RestartPolicyNever,
+			Containers:     []v1.Container{primary},
+			InitContainers: initContainers,
+			RestartPolicy:  v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
 					Name: "workspace",

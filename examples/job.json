@@ -10,5 +10,9 @@
        "args":[
           "-la"
        ]
+    },
+    "source": {
+        "git_url": "https://github.com/owainlewis/sample-project.git",
+        "git_branch": "master"
     }
  }

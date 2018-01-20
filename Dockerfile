@@ -2,6 +2,6 @@ FROM scratch
 
 MAINTAINER Owain Lewis <owain.lewis@oracle.com>
 
-COPY bin/kcd /kcd
+COPY bin/frequency /frequency
 
-CMD ["/kcd"]
+CMD ["/frequency"]

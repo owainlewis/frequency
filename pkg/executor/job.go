@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	types "github.com/owainlewis/kcd/pkg/types"
 	v1 "k8s.io/api/core/v1"
@@ -90,7 +92,7 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 				MountPath: job.Workspace,
 			}},
 			Command: []string{
-				"ash", "-c", "git clone -b + " + job.Source.GitURL + " $WORKSPACE",
+				"ash", "-c", buildGitCloneCommmand(job.Source.GitURL, job.Source.GitBranch),
 			}}
 
 		initContainers = append(initContainers, sourceCloneContainer)
@@ -121,4 +123,8 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 
 	return pod
 
+}
+
+func buildGitCloneCommmand(gitURL string, gitBranch string) string {
+	return fmt.Sprintf("git clone %s $WORKSPACE", gitURL)
 }

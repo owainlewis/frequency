@@ -5,6 +5,6 @@ jobs:
     workspace: /go/src/github.com/owainlewis/kcd
     environment:
       - FOO=bar
-    command: 
+    command:
       cmd: ./ci/build.sh
       args: []

@@ -82,6 +82,8 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 			env("GIT_URL", job.Source.GitURL),
 			env("GIT_BRANCH", job.Source.GitBranch),
 		}
+		
+		command := buildGitCloneCommmand(job.Source.GitURL, job.Source.GitBranch)
 
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
@@ -91,9 +93,7 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 				Name:      "workspace",
 				MountPath: job.Workspace,
 			}},
-			Command: []string{
-				"ash", "-c", buildGitCloneCommmand(job.Source.GitURL, job.Source.GitBranch),
-			}}
+			Command: []string{"ash", "-c", command)}}
 
 		initContainers = append(initContainers, sourceCloneContainer)
 	}

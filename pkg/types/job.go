@@ -8,7 +8,7 @@ type Command struct {
 
 // Job is the smallest unit of execution in KCD.
 // It represents the execution of a Kubernetes pod with a series of
-// commands specified by the user as part of the kcd.yml manifest file.
+// commands specified by the user as part of the frequency.yml manifest file.
 type Job struct {
 	// ID is the UID of the pod created for this job and gets assigned
 	// after a job has been submitted to Kubernetes

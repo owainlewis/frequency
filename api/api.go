@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/owainlewis/kcd/pkg/executor"
-	"github.com/owainlewis/kcd/pkg/persistence"
+	"github.com/owainlewis/frequency/pkg/executor"
+	"github.com/owainlewis/frequency/pkg/persistence"
 )
 
 type Api struct {

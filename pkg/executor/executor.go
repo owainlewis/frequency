@@ -1,7 +1,7 @@
 package executor
 
 import (
-	types "github.com/owainlewis/kcd/pkg/types"
+	types "github.com/owainlewis/frequency/pkg/types"
 )
 
 type JobExecutor interface {

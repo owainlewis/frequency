@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	types "github.com/owainlewis/kcd/pkg/types"
+	types "github.com/owainlewis/frequency/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -101,7 +101,7 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"owner": "kcd",
+				"owner": "frequency",
 			},
 		},
 		Spec: v1.PodSpec{
@@ -119,7 +119,7 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 		},
 	}
 
-	pod.SetGenerateName("kcd-")
+	pod.SetGenerateName("frequency-")
 
 	return pod
 

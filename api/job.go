@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/golang/glog"
-	"github.com/owainlewis/kcd/pkg/types"
+	"github.com/owainlewis/frequency/pkg/types"
 )
 
 // CreateJob is a HTTP handler invoked to trigger the execution of a single job

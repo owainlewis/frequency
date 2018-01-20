@@ -1,6 +1,6 @@
 package persistence
 
-import "github.com/owainlewis/kcd/pkg/types"
+import "github.com/owainlewis/frequency/pkg/types"
 
 type InMemoryStore struct {
 	jobs []types.Job

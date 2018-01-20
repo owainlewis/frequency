@@ -5,15 +5,15 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/owainlewis/kcd/pkg/persistence"
+	"github.com/owainlewis/frequency/pkg/persistence"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
-	"github.com/owainlewis/kcd/api"
-	builder "github.com/owainlewis/kcd/pkg/client"
-	"github.com/owainlewis/kcd/pkg/controller"
-	"github.com/owainlewis/kcd/pkg/executor"
+	"github.com/owainlewis/frequency/api"
+	builder "github.com/owainlewis/frequency/pkg/client"
+	"github.com/owainlewis/frequency/pkg/controller"
+	"github.com/owainlewis/frequency/pkg/executor"
 )
 
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")

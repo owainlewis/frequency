@@ -1,6 +1,6 @@
 package persistence
 
-import "github.com/owainlewis/kcd/pkg/types"
+import "github.com/owainlewis/frequency/pkg/types"
 
 type JobStore interface {
 	GetJob(id string) (*types.Job, error)

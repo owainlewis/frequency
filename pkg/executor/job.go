@@ -52,15 +52,13 @@ func env(k, v string) v1.EnvVar {
 // 2. A primary pod is created with the correct shared directories and environment
 //
 func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
-	defaultEnv := []v1.EnvVar{
-		env("WORKSPACE", job.Workspace),
-		env("OUTPUT_DIR", outputDir),
-	}
+	environment := podEnvironmentForJob(job)
+
 	primary := v1.Container{
 		Name:       "primary",
 		Image:      job.Image,
 		WorkingDir: job.Workspace,
-		Env:        defaultEnv,
+		Env:        environment,
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      "workspace",
@@ -77,23 +75,17 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 	// to go and fetch that source code from a VCS such as github.com
 	var initContainers []v1.Container
 	if job.Source != nil {
-
-		buildEnv := []v1.EnvVar{
-			env("GIT_URL", job.Source.GitURL),
-			env("GIT_BRANCH", job.Source.GitBranch),
-		}
-		
 		command := buildGitCloneCommmand(job.Source.GitURL, job.Source.GitBranch)
 
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
 			Image: "alpine/git",
-			Env:   append(defaultEnv, buildEnv...),
+			Env:   environment,
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "workspace",
 				MountPath: job.Workspace,
 			}},
-			Command: []string{"ash", "-c", command)}}
+			Command: []string{"ash", "-c", command}}
 
 		initContainers = append(initContainers, sourceCloneContainer)
 	}
@@ -123,6 +115,23 @@ func (e Executor) NewJobExecutionPod(job *types.Job) *v1.Pod {
 
 	return pod
 
+}
+
+func podEnvironmentForJob(job *types.Job) []v1.EnvVar {
+	environment := []v1.EnvVar{
+		env("WORKSPACE", job.Workspace),
+		env("OUTPUT_DIR", outputDir),
+	}
+
+	if job.Source != nil {
+		buildEnv := []v1.EnvVar{
+			env("GIT_URL", job.Source.GitURL),
+			env("GIT_BRANCH", job.Source.GitBranch),
+		}
+		environment = append(environment, buildEnv...)
+	}
+
+	return append(environment, job.Env...)
 }
 
 func buildGitCloneCommmand(gitURL string, gitBranch string) string {

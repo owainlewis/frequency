@@ -1,5 +1,9 @@
 package types
 
+import (
+	v1 "k8s.io/api/core/v1"
+)
+
 // Command describes the command to run inside a Pod container
 type Command struct {
 	Cmd  string   `json:"cmd"`
@@ -12,13 +16,13 @@ type Command struct {
 type Job struct {
 	// ID is the UID of the pod created for this job and gets assigned
 	// after a job has been submitted to Kubernetes
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Image       string            `json:"image"`
-	Workspace   string            `json:"workspace"`
-	Environment map[string]string `json:"environment"`
-	Command     Command           `json:"command"`
-	Source      *Source           `json:"source"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Image     string      `json:"image"`
+	Workspace string      `json:"workspace"`
+	Env       []v1.EnvVar `json:"env,omitempty"`
+	Command   Command     `json:"command"`
+	Source    *Source     `json:"source,omitempty"`
 }
 
 // EnsureDefaults will set default values on a job

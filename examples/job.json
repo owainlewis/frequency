@@ -1,18 +1,25 @@
 {
-    "name":"api-example",
-    "workspace":"/workspace",
-    "environment": {
-        "FOO": "bar"
-    },
     "image":"golang",
+    "workspace":"/go/src/github.com/owainlewis/frequency-demo-project",
+    "env":[
+      {
+        "name":"SECRET_USERNAME",
+        "valueFrom":{
+          "secretKeyRef":{
+            "name":"mysecret",
+            "key":"username"
+          }
+        }
+      }
+    ],
     "command":{
-       "cmd":"ls",
-       "args":[
-          "-la"
-       ]
+      "cmd":"./ci/build.sh",
+      "args":[
+
+      ]
     },
-    "source": {
-        "git_url": "https://github.com/owainlewis/conventional-si-unit-converter.git",
-        "git_branch": "master"
+    "source":{
+      "git_url":"https://github.com/owainlewis/frequency-demo-project.git",
+      "git_branch":"master"
     }
- }
+}

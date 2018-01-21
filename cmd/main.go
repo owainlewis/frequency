@@ -39,7 +39,10 @@ func main() {
 		return
 	}
 
-	ctrl := controller.NewController(client)
+	// This should be MySQL in production
+	store := persistence.NewInMemoryStore()
+	ctrl := controller.NewController(client, store)
+
 	stop := make(chan struct{})
 
 	defer close(stop)

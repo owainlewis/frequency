@@ -16,6 +16,9 @@ import (
 	workqueue "k8s.io/client-go/util/workqueue"
 )
 
+// This controller observes pod change events and enables us to track
+// the state of updates
+// TODO(owlewis) narrow down scope by label selector to only watch pods we care about
 type Controller struct {
 	indexer  cache.Indexer
 	queue    workqueue.RateLimitingInterface
@@ -24,19 +27,19 @@ type Controller struct {
 	store persistence.Datastore
 }
 
-func NewController(clientset kubernetes.Interface) *Controller {
+func NewController(clientset kubernetes.Interface, store persistence.Datastore) *Controller {
 	// create the pod watcher (TODO filter by label)
 	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
 
 	// create the workqueue
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	indexer, informer := cache.NewIndexerInformer(podListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
-		// AddFunc: func(obj interface{}) {
-		// 	key, err := cache.MetaNamespaceKeyFunc(obj)
-		// 	if err == nil {
-		// 		queue.Add(key)
-		// 	}
-		// },
+		AddFunc: func(obj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(obj)
+			if err == nil {
+				queue.Add(key)
+			}
+		},
 		UpdateFunc: func(old interface{}, new interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(new)
 			if err == nil {
@@ -55,6 +58,7 @@ func NewController(clientset kubernetes.Interface) *Controller {
 		informer: informer,
 		indexer:  indexer,
 		queue:    queue,
+		store:    store,
 	}
 }
 

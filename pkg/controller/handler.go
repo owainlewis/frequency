@@ -10,20 +10,28 @@ import (
 // pushed back to the upstream API server
 func (c *Controller) podUpdateHandler(pod *v1.Pod) {
 
-	pid := pod.GetUID()
+	podCopy := pod.DeepCopy()
+
+	pid := string(podCopy.GetUID())
 	glog.Infof("Pod %s %s is in phase %s", pid, pod.GetName(), pod.Status.Phase)
 
-	job, err := c.store.FindJobByID(string(pid))
-	if err != nil {
+	if c.store == nil {
+		glog.Warning("Datastore is unbound. Refusing to progress")
+		return
+	}
 
+	job, err := c.store.FindJobByID(pid)
+	if err != nil {
+		glog.Errorf("Failed to find job in data store: %s", err)
+		return
 	}
 
 	glog.Infof("Found matching job %s. Attempting to update status", job.ID)
 
-	// c.store.UpdateJob()
+	//c.store.UpdateJob(job)
+
 	// Get the job where ID == pid and update the status
 	// Update the status of the job in the API
-
 	// LOGS
 
 }

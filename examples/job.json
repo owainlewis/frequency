@@ -2,24 +2,13 @@
     "image":"golang",
     "workspace":"/go/src/github.com/owainlewis/frequency-demo-project",
     "env":[
-      {
-        "name":"SECRET_USERNAME",
-        "valueFrom":{
-          "secretKeyRef":{
-            "name":"mysecret",
-            "key":"username"
-          }
-        }
-      }
     ],
     "command":{
-      "cmd":"./ci/build.sh",
-      "args":[
-
-      ]
+      "cmd":"ls",
+      "args": ["-la"]
     },
     "source":{
-      "git_url":"https://github.com/owainlewis/frequency-demo-project.git",
+      "git_url":"https://github.com/owainlewis/frequency-sample-project.git",
       "git_branch":"master"
     }
 }

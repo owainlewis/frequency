@@ -17,7 +17,6 @@ type Job struct {
 	// ID is the UID of the pod created for this job and gets assigned
 	// after a job has been submitted to Kubernetes
 	ID        string      `json:"id"`
-	Name      string      `json:"name"`
 	Image     string      `json:"image"`
 	Workspace string      `json:"workspace"`
 	Env       []v1.EnvVar `json:"env,omitempty"`

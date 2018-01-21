@@ -1,5 +1,6 @@
 package types
 
 type Project struct {
-	Name string
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }

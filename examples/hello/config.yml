@@ -3,8 +3,13 @@ jobs:
   build:
     image: golang
     workspace: /go/src/github.com/owainlewis/kcd
-    environment:
-      - FOO=bar
+    env:
+      - name: SECRET_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: mysecret
+            key: username
     command:
       cmd: ./ci/build.sh
       args: []
+

@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/glog"
 
+	persistence "github.com/owainlewis/frequency/pkg/persistence"
 	v1 "k8s.io/api/core/v1"
 	fields "k8s.io/apimachinery/pkg/fields"
 	runtime "k8s.io/apimachinery/pkg/util/runtime"
@@ -19,6 +20,8 @@ type Controller struct {
 	indexer  cache.Indexer
 	queue    workqueue.RateLimitingInterface
 	informer cache.Controller
+
+	store persistence.Datastore
 }
 
 func NewController(clientset kubernetes.Interface) *Controller {

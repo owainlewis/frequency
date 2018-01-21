@@ -26,13 +26,13 @@ func (api Api) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pid := pod.GetUID()
+	job.ID = string(pod.GetUID())
 
-	job.ID = string(pid)
-
-	glog.Infof("Saving job %v", job)
-
-	// Write job to database and set the pod ID as the
+	// We store the job to our persistent store
+	// The Kubernetes controller for Pods will watch the state of this
+	// pod as it progresses and update the job status
+	glog.Infof("Saving job %s to database", job.ID)
+	api.Store.CreateJob(&job)
 
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(&pod)

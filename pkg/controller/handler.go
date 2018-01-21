@@ -11,11 +11,17 @@ import (
 func (c *Controller) podUpdateHandler(pod *v1.Pod) {
 
 	pid := pod.GetUID()
-
 	glog.Infof("Pod %s %s is in phase %s", pid, pod.GetName(), pod.Status.Phase)
 
-	// Get the job where ID == pid and update the status
+	job, err := c.store.FindJobByID(string(pid))
+	if err != nil {
 
+	}
+
+	glog.Infof("Found matching job %s. Attempting to update status", job.ID)
+
+	// c.store.UpdateJob()
+	// Get the job where ID == pid and update the status
 	// Update the status of the job in the API
 
 	// LOGS

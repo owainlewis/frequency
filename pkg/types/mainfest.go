@@ -7,10 +7,10 @@ type Manifest struct {
 	Jobs    map[string]Job `json:"jobs"`
 }
 
-func (m *Manifest) EnsureDefaults() *Manifest {
+// EnsureDefaults will ensure sensible default values are set for the
+// ManifestType if absent.
+func (m *Manifest) EnsureDefaults() {
 	if m.Version == 0 {
 		m.Version = 1
 	}
-
-	return m
 }

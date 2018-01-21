@@ -3,8 +3,8 @@ package persistence
 import "github.com/owainlewis/frequency/pkg/types"
 
 type JobStore interface {
-	GetJob(id string) (*types.Job, error)
-	SaveJob(job types.Job) error
+	FindJobByID(id string) (*types.Job, error)
+	CreateJob(job *types.Job) error
 }
 
 type ProjectStore interface {

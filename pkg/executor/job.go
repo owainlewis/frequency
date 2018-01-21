@@ -27,7 +27,7 @@ func NewExecutor(clientset kubernetes.Interface) Executor {
 
 // Execute will execute a single job
 func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
-	glog.Infof("Executing job: %s", job.Name)
+	glog.Infof("Executing job: %+v", job)
 	template := e.NewJobExecutionPod(job)
 
 	// TODO which namespace to run in (must be configurable)

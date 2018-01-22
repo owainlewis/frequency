@@ -24,19 +24,24 @@ Notice that environment variables are stored as Kubernetes secrets.
 
 ```yaml
 version: 1
-jobs:
+stages:
+  wait-60-seconds:
+    kind: Wait
+    durationSeconds: 60
   build:
-    image: golang
-    workspace: /go/src/github.com/owainlewis/kcd
-    environment:
-      values:
-        GOOS: linux
-        GOARCH: amd64
-      secretRef:
-        name: my-build-secrets
-    command:
-      cmd: ./ci/build.sh
-      args: []
+    kind: Pod
+    spec: 
+      image: golang
+      workspace: /go/src/github.com/owainlewis/kcd
+      environment:
+        values:
+          GOOS: linux
+          GOARCH: amd64
+        secretRef:
+          name: my-build-secrets
+      command:
+        cmd: ./ci/build.sh
+        args: []
 ```
 
 ## Getting Started

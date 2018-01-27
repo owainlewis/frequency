@@ -12,7 +12,7 @@ test:
 
 .PHONY: job
 job:
-	@curl -iX POST localhost:3000/api/v1/jobs --data-binary "@examples/job.json"
+	@curl -iX POST localhost:3000/api/v1/tasks/pod --data-binary "@examples/pod-task.json"
 
 .PHONY: run
 run:

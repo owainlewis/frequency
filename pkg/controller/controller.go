@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
-	persistence "github.com/owainlewis/frequency/pkg/persistence"
 	v1 "k8s.io/api/core/v1"
 	fields "k8s.io/apimachinery/pkg/fields"
 	runtime "k8s.io/apimachinery/pkg/util/runtime"
@@ -16,18 +14,13 @@ import (
 	workqueue "k8s.io/client-go/util/workqueue"
 )
 
-// This controller observes pod change events and enables us to track
-// the state of updates
-// TODO(owlewis) narrow down scope by label selector to only watch pods we care about
 type Controller struct {
 	indexer  cache.Indexer
 	queue    workqueue.RateLimitingInterface
 	informer cache.Controller
-
-	store persistence.Datastore
 }
 
-func NewController(clientset kubernetes.Interface, store persistence.Datastore) *Controller {
+func NewController(clientset kubernetes.Interface) *Controller {
 	// create the pod watcher (TODO filter by label)
 	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
 
@@ -58,7 +51,6 @@ func NewController(clientset kubernetes.Interface, store persistence.Datastore) 
 		informer: informer,
 		indexer:  indexer,
 		queue:    queue,
-		store:    store,
 	}
 }
 

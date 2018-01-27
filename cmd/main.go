@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/owainlewis/frequency/pkg/persistence"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/golang/glog"
@@ -39,9 +38,7 @@ func main() {
 		return
 	}
 
-	// This should be MySQL in production
-	store := persistence.NewInMemoryStore()
-	ctrl := controller.NewController(client, store)
+	ctrl := controller.NewController(client)
 
 	stop := make(chan struct{})
 
@@ -51,7 +48,7 @@ func main() {
 	API := buildAPI(client)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/jobs", API.CreateJob).Methods("POST")
+	router.HandleFunc("/api/v1/tasks/pod", API.CreatePodTask).Methods("POST")
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
 
 	glog.Info("Starting API server...")
@@ -61,7 +58,6 @@ func main() {
 }
 
 func buildAPI(client kubernetes.Interface) api.Api {
-	ex := executor.NewExecutor(client)
-	db := persistence.InMemoryStore{}
-	return api.New(ex, db)
+	ex := executor.NewPodTaskExecutor(client)
+	return api.New(ex)
 }

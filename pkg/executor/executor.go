@@ -1,9 +1,7 @@
 package executor
 
-import (
-	types "github.com/owainlewis/frequency/pkg/types"
-)
+import "github.com/owainlewis/frequency/pkg/tasks"
 
-type JobExecutor interface {
-	Execute(job types.Job) error
+type TaskExecutor interface {
+	Execute(task tasks.PodTask) error
 }

@@ -2,17 +2,14 @@ package api
 
 import (
 	"github.com/owainlewis/frequency/pkg/executor"
-	"github.com/owainlewis/frequency/pkg/persistence"
 )
 
 type Api struct {
-	Executor executor.Executor
-	Store    persistence.Datastore
+	Executor executor.TaskExecutor
 }
 
-func New(executor executor.Executor, store persistence.Datastore) Api {
+func New(executor executor.TaskExecutor) Api {
 	return Api{
 		Executor: executor,
-		Store:    store,
 	}
 }

@@ -33,7 +33,7 @@ func (e Executor) Execute(job *types.Job) (*v1.Pod, error) {
 	// TODO which namespace to run in (must be configurable)
 	pod, err := e.Client.CoreV1().Pods(v1.NamespaceDefault).Create(template)
 	if err != nil {
-		glog.Infof("Failed to create pod")
+		glog.Infof("Failed to create pod: %s", err)
 		return nil, err
 	}
 

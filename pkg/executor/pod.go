@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,10 +22,15 @@ func NewPodTaskExecutor(clientset kubernetes.Interface) PodTaskExecutor {
 }
 
 // Execute will execute a single job
-func (e PodTaskExecutor) Execute(task tasks.PodTask) error {
+func (e PodTaskExecutor) Execute(task tasks.Task) error {
 	glog.Infof("Executing Pod task: %+v", task)
 
-	taskPod := e.newPod(task)
+	if task.GetKind() != "PodTask" {
+		return fmt.Errorf("Invalid task kind for PodTaskExecutor")
+	}
+
+	podTask := task.(tasks.PodTask)
+	taskPod := e.newPod(podTask)
 
 	// TODO which namespace to run in (must be configurable)
 	_, err := e.Client.CoreV1().Pods(v1.NamespaceDefault).Create(taskPod)

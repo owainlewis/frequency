@@ -15,6 +15,21 @@ Kubernetes offers many advantages for CI/CD such as:
 * Run CI on your own private infrastructure
 * Utilise all the native Kubernetes tooling and security.
 
+## Tasks
+
+#### Pod Task
+
+Execute an arbitrary script inside a Pod. This is equivalent to a Jenkins job.
+
+#### Wait Task
+
+Execute a Pod and wait for some fixed duration.
+
+#### CI Task
+
+Similar to a Pod Task execept an init container will be used to perform a Git Clone of your source code.
+Similar to a Wercker or CircleCI type CI build.
+
 ## Sample build manifest
 
 Build manifests are kept inside your project source. The following example shows a build

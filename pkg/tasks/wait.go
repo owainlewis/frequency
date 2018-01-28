@@ -1,13 +1,13 @@
 package tasks
 
-type Wait struct {
-	DurationSeconds int
+type WaitTask struct {
+	Duration int
 }
 
-func (t Wait) GetKind() string {
+func (t WaitTask) GetKind() string {
 	return "WAIT"
 }
 
-func (t Wait) GetStatus() string {
-	return "PENDING"
+func (t WaitTask) GetStatus() string {
+	return ""
 }

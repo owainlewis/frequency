@@ -39,12 +39,12 @@ Notice that environment variables are stored as Kubernetes secrets.
 
 ```yaml
 version: 1
-stages:
+tasks:
   wait-60-seconds:
     kind: Wait
-    durationSeconds: 60
+    duration: 60
   build:
-    kind: Pod
+    kind: CI
     spec: 
       image: golang
       workspace: /go/src/github.com/owainlewis/kcd

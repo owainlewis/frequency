@@ -9,5 +9,11 @@ type Source struct {
 type CITask struct {
 	PodTask
 
+	Workspace string
+
 	Source *Source
+}
+
+func (t CITask) GetKind() string {
+	return "CITask"
 }

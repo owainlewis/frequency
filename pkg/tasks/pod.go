@@ -14,14 +14,10 @@ type PodTask struct {
 
 // Command describes the command to run inside a Pod container
 type Command struct {
-	Cmd  string   `json:"cmd"`
+	Cmd  []string `json:"cmd"`
 	Args []string `json:"args"`
 }
 
 func (t PodTask) GetKind() string {
 	return "PodTask"
-}
-
-func (t PodTask) GetStatus() string {
-	return "Succeeded"
 }

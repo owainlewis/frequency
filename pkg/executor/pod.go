@@ -42,17 +42,13 @@ func (e PodTaskExecutor) Execute(task tasks.Task) error {
 	return nil
 }
 
-func env(k, v string) v1.EnvVar {
-	return v1.EnvVar{Name: k, Value: v}
-}
-
 func (e PodTaskExecutor) newPod(task tasks.PodTask) *v1.Pod {
 	primary := v1.Container{
 		Name:       "primary",
 		Image:      task.Image,
 		WorkingDir: task.Workspace,
 		Env:        task.Env,
-		Command:    []string{task.Command.Cmd},
+		Command:    task.Command.Cmd,
 		Args:       task.Command.Args,
 	}
 

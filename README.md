@@ -17,6 +17,10 @@ Kubernetes offers many advantages for CI/CD such as:
 
 ## Task
 
+A task runs code inside a Docker container. 
+
+Optionally you may clone source code prior to running the task for CI like problems.
+
 ```yaml
 image: golang
 workspace: /
@@ -32,40 +36,26 @@ run:
 ```
 
 ```javascript
-var task = frequency.NewTask({image: golang});
+var frequency = require('frequency');
 
-task.run();
+var taskDef = {image: golang, run: {command: "ci.sh"}};
+var task = frequency.NewTask(taskDef);
+
+task.submit();
 ```
 
-## Sample build manifest
+## Misc
 
-Build manifests are kept inside your project source. The following example shows a build
-manifest for building a golang binary inside a container.
+### Job
 
-Notice that environment variables are stored as Kubernetes secrets.
+## Trigger (cron, webhook etc)
 
-```yaml
-version: 1
-tasks:
-  wait-60-seconds:
-    kind: Wait
-    duration: 60
-  build:
-    kind: CI
-    spec:
-      image: golang
-      workspace: /go/src/github.com/owainlewis/kcd
-      environment:
-        values:
-          GOOS: linux
-          GOARCH: amd64
-        secretRef:
-          name: my-build-secrets
-      command:
-        cmd: ./ci/build.sh
-        args: []
+A trigger is used to execute a job when something happens. This could be a cron schedule or an external event.
+
+```javascript
+
+var trigger = frequency.NewCronTrigger(task: ping);
+
+trigger.create();
 ```
 
-## Getting Started
-
-TODO

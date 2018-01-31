@@ -41,7 +41,9 @@ var frequency = require('frequency');
 var taskDef = {image: golang, run: {command: "ci.sh"}};
 var task = frequency.NewTask(taskDef);
 
-task.submit();
+task.submit().onSuccess(function(ctx) {
+    console.log("Task has completed");
+});
 ```
 
 ## Misc

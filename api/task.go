@@ -7,14 +7,16 @@ import (
 	"github.com/owainlewis/frequency/pkg/tasks"
 )
 
-// CreatePodTask ...
-func (api Api) CreatePodTask(w http.ResponseWriter, r *http.Request) {
-	var task tasks.PodTask
+// CreateTask ...
+func (api Api) CreateTask(w http.ResponseWriter, r *http.Request) {
+	var task tasks.Task
 
 	err := json.NewDecoder(r.Body).Decode(&task)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
+
+	task.SetDefaults()
 
 	err = api.Executor.Execute(task)
 	if err != nil {
@@ -23,8 +25,5 @@ func (api Api) CreatePodTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//task.ID = string(pod.GetUID())
-
 	w.WriteHeader(http.StatusAccepted)
-	//json.NewEncoder(w).Encode(&pod)
 }

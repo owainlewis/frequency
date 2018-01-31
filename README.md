@@ -15,20 +15,21 @@ Kubernetes offers many advantages for CI/CD such as:
 * Run CI on your own private infrastructure
 * Utilise all the native Kubernetes tooling and security.
 
-## Tasks
+## Task
 
-#### Pod Task
-
-Execute an arbitrary script inside a Pod. This is equivalent to a Jenkins job.
-
-#### Wait Task
-
-Execute a Pod and wait for some fixed duration.
-
-#### CI Task
-
-Similar to a Pod Task execept an init container will be used to perform a Git Clone of your source code.
-Similar to a Wercker or CircleCI type CI build.
+```
+image: golang
+workspace: /
+run:
+  command:
+    - bash
+    - -exc
+  args:
+  - |
+    whoami
+    env
+    go version
+```
 
 ## Sample build manifest
 
@@ -45,7 +46,7 @@ tasks:
     duration: 60
   build:
     kind: CI
-    spec: 
+    spec:
       image: golang
       workspace: /go/src/github.com/owainlewis/kcd
       environment:

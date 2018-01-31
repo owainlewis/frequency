@@ -39,12 +39,6 @@ func NewController(clientset kubernetes.Interface) *Controller {
 				queue.Add(key)
 			}
 		},
-		// DeleteFunc: func(obj interface{}) {
-		// 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-		// 	if err == nil {
-		// 		queue.Add(key)
-		// 	}
-		// },
 	}, cache.Indexers{})
 
 	return &Controller{

@@ -1,0 +1,8 @@
+{
+    "image":"golang",
+    "workspace": "/workspace",
+    "run":{
+      "command": ["bash", "-exc"],
+      "args": ["whoami\nenv\nls -la /workspace"]
+    }
+}

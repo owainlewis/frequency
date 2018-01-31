@@ -1,7 +1,0 @@
-{
-    "image":"golang",
-    "command":{
-      "cmd":"ls",
-      "args": ["-la"]
-    }
-}

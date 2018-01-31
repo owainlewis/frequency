@@ -48,7 +48,7 @@ func main() {
 	API := buildAPI(client)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/tasks/pod", API.CreatePodTask).Methods("POST")
+	router.HandleFunc("/api/v1/tasks", API.CreateTask).Methods("POST")
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
 
 	glog.Info("Starting API server...")
@@ -58,6 +58,6 @@ func main() {
 }
 
 func buildAPI(client kubernetes.Interface) api.Api {
-	ex := executor.NewPodTaskExecutor(client)
+	ex := executor.NewTaskExecutor(client)
 	return api.New(ex)
 }

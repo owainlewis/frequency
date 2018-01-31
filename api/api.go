@@ -5,10 +5,10 @@ import (
 )
 
 type Api struct {
-	Executor executor.TaskExecutor
+	Executor executor.Executor
 }
 
-func New(executor executor.TaskExecutor) Api {
+func New(executor executor.Executor) Api {
 	return Api{
 		Executor: executor,
 	}

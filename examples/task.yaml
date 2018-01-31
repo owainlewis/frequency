@@ -1,0 +1,17 @@
+image: golang
+workspace: /
+#env:
+#  - name: SECRET_USERNAME
+#    valueFrom:
+#      secretKeyRef:
+#        name: mysecret
+#        key: username
+run:
+  command:
+    - bash
+    - -exc
+  args:
+  - |
+    whoami
+    env
+    go version

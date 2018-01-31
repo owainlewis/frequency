@@ -2,6 +2,6 @@ package executor
 
 import "github.com/owainlewis/frequency/pkg/tasks"
 
-type TaskExecutor interface {
+type Executor interface {
 	Execute(task tasks.Task) error
 }

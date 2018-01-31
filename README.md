@@ -17,7 +17,7 @@ Kubernetes offers many advantages for CI/CD such as:
 
 ## Task
 
-```
+```yaml
 image: golang
 workspace: /
 run:
@@ -29,6 +29,12 @@ run:
     whoami
     env
     go version
+```
+
+```javascript
+var task = frequency.NewTask({image: golang});
+
+task.run();
 ```
 
 ## Sample build manifest

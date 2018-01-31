@@ -16,6 +16,10 @@ A simple JavaScript UI that can be used to visualize and manage projects, builds
 
 A webhook HTTP endpoint is exposed
 
+#### Cron
+
+Trigger a task on cron
+
 #### Poll source
 
 A controller that will poll a Git repo watching for changes

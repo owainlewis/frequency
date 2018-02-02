@@ -1,3 +1,5 @@
+VERSION=$(shell git describe --always)
+
 .PHONY: build
 build:
 	@go build cmd/main.go

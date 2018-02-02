@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,19 +57,23 @@ func (e TaskExecutor) newPod(task tasks.Task) *v1.Pod {
 	// 	// // to go and fetch that source code from a VCS such as github.com
 	// 	// var initContainers []v1.Container
 	var initContainers []v1.Container
-	//if task.Source != nil {
 
-	sourceCloneContainer := v1.Container{
-		Name:  "setup",
-		Image: "alpine/git",
-		VolumeMounts: []v1.VolumeMount{{
-			Name:      "workspace",
-			MountPath: task.Workspace,
-		}},
-		Command: []string{"ash", "-c", "git clone https://github.com/owainlewis/frequency.git /workspace"}}
+	if task.Source != nil {
 
-	initContainers = append(initContainers, sourceCloneContainer)
-	//}
+		glog.Infof("Cloning code from %s", task.Source.GitURL)
+
+		cloneCommand := fmt.Sprintf("git clone %s /workspace", task.Source.GitURL)
+		sourceCloneContainer := v1.Container{
+			Name:  "setup",
+			Image: "alpine/git",
+			VolumeMounts: []v1.VolumeMount{{
+				Name:      "workspace",
+				MountPath: task.Workspace,
+			}},
+			Command: []string{"ash", "-c", cloneCommand}}
+
+		initContainers = append(initContainers, sourceCloneContainer)
+	}
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

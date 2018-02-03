@@ -1,8 +1,12 @@
 {
     "image":"golang",
     "workspace": "/workspace",
+    "source": {
+      "git_url": "https://github.com/owainlewis/oci-forward-proxy.git",
+      "git_branch": "master"
+    },
     "run":{
       "command": ["bash", "-exc"],
-      "args": ["whoami\nenv\nls -la /workspace"]
+      "args": ["go test ./..."]
     }
 }

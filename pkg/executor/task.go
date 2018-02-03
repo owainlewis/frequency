@@ -1,14 +1,12 @@
 package executor
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
 
-	tasks "github.com/owainlewis/frequency/pkg/tasks"
+	"github.com/owainlewis/frequency/pkg/types"
 )
 
 // TaskExecutor ...
@@ -21,8 +19,8 @@ func NewTaskExecutor(clientset kubernetes.Interface) TaskExecutor {
 	return TaskExecutor{Client: clientset}
 }
 
-// Execute will execute a single job
-func (e TaskExecutor) Execute(task tasks.Task) error {
+// ExecuteTask will execute a single task and return an error if it cannot be executed
+func (e TaskExecutor) ExecuteTask(task types.Task) error {
 	glog.Infof("Executing task: %+v", task)
 
 	taskPod := e.newPod(task)
@@ -37,7 +35,7 @@ func (e TaskExecutor) Execute(task tasks.Task) error {
 	return nil
 }
 
-func (e TaskExecutor) newPod(task tasks.Task) *v1.Pod {
+func (e TaskExecutor) newPod(task types.Task) *v1.Pod {
 	primary := v1.Container{
 		Name:       "primary",
 		Image:      task.Image,
@@ -58,11 +56,13 @@ func (e TaskExecutor) newPod(task tasks.Task) *v1.Pod {
 	// 	// var initContainers []v1.Container
 	var initContainers []v1.Container
 
+	glog.Infof("Task %+v", task)
+
 	if task.Source != nil {
 
 		glog.Infof("Cloning code from %s", task.Source.GitURL)
 
-		cloneCommand := fmt.Sprintf("git clone %s /workspace", task.Source.GitURL)
+		cloneCommand := "git clone $GIT_SOURCE $WORKSPACE"
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
 			Image: "alpine/git",
@@ -94,4 +94,9 @@ func (e TaskExecutor) newPod(task tasks.Task) *v1.Pod {
 	pod.SetGenerateName("task-")
 
 	return pod
+}
+
+func buildEnvironmentVariables(task *types.Task) []v1.EnvVar {
+	var env []v1.EnvVar
+	return env
 }

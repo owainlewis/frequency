@@ -98,5 +98,16 @@ func (e TaskExecutor) newPod(task types.Task) *v1.Pod {
 
 func buildEnvironmentVariables(task *types.Task) []v1.EnvVar {
 	var env []v1.EnvVar
+	// Project and general information
+	// FREQUENCY_PROJECT_NAME
+	// Task information
+	// FREQUENCY_TASK_ID
+	// FREQUENCY_TASK_WORKSPACE
+	// Git Information
+	// FREQUENCY_GIT_DOMAIN="github.com"
+	// FREQUENCY_GIT_OWNER="oracle"
+	// FREQUENCY_GIT_REPOSITORY="terraform-kubernetes-installer"
+	// FREQUENCY_GIT_BRANCH="master"
+	// FREQUENCY_GIT_COMMIT="4fc26b093db08a6079e27016d1903b66aa93604b"
 	return env
 }

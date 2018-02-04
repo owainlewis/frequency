@@ -9,18 +9,18 @@ import (
 	"github.com/owainlewis/frequency/pkg/types"
 )
 
-// TaskExecutor ...
-type TaskExecutor struct {
+// DefaultTaskExecutor ...
+type DefaultTaskExecutor struct {
 	Client kubernetes.Interface
 }
 
-// NewTaskExecutor creates a properly configured TaskExecutor
-func NewTaskExecutor(clientset kubernetes.Interface) TaskExecutor {
-	return TaskExecutor{Client: clientset}
+// NewDefaultTaskExecutor creates a properly configured DefaultTaskExecutor
+func NewDefaultTaskExecutor(clientset kubernetes.Interface) DefaultTaskExecutor {
+	return DefaultTaskExecutor{Client: clientset}
 }
 
 // ExecuteTask will execute a single task and return an error if it cannot be executed
-func (e TaskExecutor) ExecuteTask(task types.Task) error {
+func (e DefaultTaskExecutor) ExecuteTask(task types.Task) error {
 	glog.Infof("Executing task: %+v", task)
 
 	taskPod := e.newPod(task)
@@ -35,7 +35,7 @@ func (e TaskExecutor) ExecuteTask(task types.Task) error {
 	return nil
 }
 
-func (e TaskExecutor) newPod(task types.Task) *v1.Pod {
+func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 	primary := v1.Container{
 		Name:       "primary",
 		Image:      task.Image,
@@ -62,7 +62,7 @@ func (e TaskExecutor) newPod(task types.Task) *v1.Pod {
 
 		glog.Infof("Cloning code from %s", task.Source.GitURL)
 
-		cloneCommand := "git clone $GIT_SOURCE $WORKSPACE"
+		cloneCommand := "git clone $GIT_SOURCE $FREQUENCY_TASK_WORKSPACE"
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
 			Image: "alpine/git",
@@ -96,14 +96,26 @@ func (e TaskExecutor) newPod(task types.Task) *v1.Pod {
 	return pod
 }
 
+func envVar(name, value string) v1.EnvVar {
+	return v1.EnvVar{
+		Name:  name,
+		Value: value,
+	}
+}
+
 func buildEnvironmentVariables(task *types.Task) []v1.EnvVar {
 	var env []v1.EnvVar
+
 	// Project and general information
 	// FREQUENCY_PROJECT_NAME
+
 	// Task information
-	// FREQUENCY_TASK_ID
-	// FREQUENCY_TASK_WORKSPACE
+	env = append(env, envVar("FREQUENCY_TASK_WORKSPACE", task.Workspace))
+
 	// Git Information
+	if task.Source != nil {
+
+	}
 	// FREQUENCY_GIT_DOMAIN="github.com"
 	// FREQUENCY_GIT_OWNER="oracle"
 	// FREQUENCY_GIT_REPOSITORY="terraform-kubernetes-installer"

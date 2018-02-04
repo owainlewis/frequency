@@ -21,10 +21,16 @@ type run struct {
 
 // Source describes the source code VCS information (e.g. Github branch and commit SHA)
 type Source struct {
+	//DOMAIN="github.com"
+	//OWNER="oracle"
+	//REPOSITORY="terraform-kubernetes-installer"
+	//BRANCH="master"
+	//COMMIT="4fc26b093db08a6079e27016d1903b66aa93604b"
 	GitURL    string `json:"git_url"`
 	GitBranch string `json:"git_branch"`
 }
 
+// SetDefaults ensures that sensible default values are applied to a task
 func (t Task) SetDefaults() {
 	if t.Workspace == "" {
 		t.Workspace = "/"

@@ -18,14 +18,12 @@ import (
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
 
 var banner = `
-#
-#    ___
-#   /
-#  (___  ___  ___  ___       ___  ___  ___
-#  |    |   )|___)|   )|   )|___)|   )|    \   )
-#  |    |    |__  |__/||__/ |__  |  / |__   \_/
-#                     |                      /
-#
+_____
+_/ ____\______   ____  ________ __   ____   ____   ____ ___.__.
+\   __\\_  __ \_/ __ \/ ____/  |  \_/ __ \ /    \_/ ___<   |  |
+ |  |   |  | \/\  ___< <_|  |  |  /\  ___/|   |  \  \___\___  |
+ |__|   |__|    \___  >__   |____/  \___  >___|  /\___  > ____|
+                    \/   |__|           \/     \/     \/\/
 `
 
 func main() {
@@ -48,8 +46,12 @@ func main() {
 	API := buildAPI(client)
 
 	router := mux.NewRouter()
+
+	// Tasks
 	router.HandleFunc("/api/v1/tasks", API.CreateTask).Methods("POST")
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
+
+	// Builds
+	router.HandleFunc("/api/v1/projects/{id:[0-9]+}/builds", API.CreateBuild).Methods("POST")
 
 	glog.Info("Starting API server...")
 	glog.Info(banner)
@@ -58,6 +60,6 @@ func main() {
 }
 
 func buildAPI(client kubernetes.Interface) api.Api {
-	ex := executor.NewTaskExecutor(client)
+	ex := executor.NewDefaultExecutor(client)
 	return api.New(ex)
 }

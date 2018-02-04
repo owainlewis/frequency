@@ -15,49 +15,10 @@ Kubernetes offers many advantages for CI/CD such as:
 * Run CI on your own private infrastructure
 * Utilise all the native Kubernetes tooling and security.
 
-## Task
+## Concepts
 
-A task runs code inside a Docker container. 
+#### Task
 
-Optionally you may clone source code prior to running the task for CI like problems.
+#### Build
 
-```yaml
-image: golang
-workspace: /
-run:
-  command:
-    - bash
-    - -exc
-  args:
-  - |
-    whoami
-    env
-    go version
-```
-
-```javascript
-var frequency = require('frequency');
-
-var taskDef = {image: golang, run: {command: "ci.sh"}};
-var task = frequency.NewTask(taskDef);
-
-task.submit().onSuccess(function(ctx) {
-    console.log("Task has completed");
-});
-```
-
-## Misc
-
-### Job
-
-## Trigger (cron, webhook etc)
-
-A trigger is used to execute a job when something happens. This could be a cron schedule or an external event.
-
-```javascript
-
-var trigger = frequency.NewCronTrigger(task: ping);
-
-trigger.create();
-```
-
+#### Trigger

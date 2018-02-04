@@ -15,12 +15,12 @@ test:
 .PHONY: run-task
 run-task:
 	@curl -iX POST --header "Content-Type: application/json" \
-	localhost:3000/api/v1/tasks --data-binary "@examples/task.json"
+	localhost:9000/api/v1/tasks --data-binary "@examples/task.json"
 
 .PHONY: run-build
 run-build:
 	@curl -iX POST --header "Content-Type: application/json" \
-	localhost:3000/api/v1/projects/1/builds --data-binary "@examples/build.json"
+	localhost:9000/api/v1/projects/1/builds --data-binary "@examples/build.json"
 
 
 .PHONY: run

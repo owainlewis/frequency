@@ -15,6 +15,10 @@ import (
 	"github.com/owainlewis/frequency/pkg/executor"
 )
 
+const (
+	host = ":9000"
+)
+
 var kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig file")
 
 var banner = `
@@ -56,7 +60,7 @@ func main() {
 	glog.Info("Starting API server...")
 	glog.Info(banner)
 
-	log.Fatal(http.ListenAndServe(":3000", router))
+	log.Fatal(http.ListenAndServe(host, router))
 }
 
 func buildAPI(client kubernetes.Interface) api.Api {

@@ -1,0 +1,7 @@
+image: golang
+run:
+  command:
+    - bash
+    - "-exc"
+  args:
+    - echo "Hello, World!"

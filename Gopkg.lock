@@ -56,12 +56,6 @@
   revision = "84f4bee7c0a6db40e3166044c7983c1c32125429"
 
 [[projects]]
-  name = "github.com/go-sql-driver/mysql"
-  packages = ["."]
-  revision = "a0583e0143b1624142adab07e0e97fe106d99561"
-  version = "v1.3"
-
-[[projects]]
   name = "github.com/gogo/protobuf"
   packages = ["proto","sortkeys"]
   revision = "342cbe0a04158f6dcb03ca0079991a51a4248c02"
@@ -232,6 +226,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c109e7f322abdc34e366281bb3664372b561dc3537110b8d8233dde2890790e3"
+  inputs-digest = "3b41da6daba59fcff03eb86aa44ce6a0a95b4004c6eb72c92c620bc3932b8799"
   solver-name = "gps-cdcl"
   solver-version = 1

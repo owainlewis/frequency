@@ -26,8 +26,8 @@ type Source struct {
 	//REPOSITORY="terraform-kubernetes-installer"
 	//BRANCH="master"
 	//COMMIT="4fc26b093db08a6079e27016d1903b66aa93604b"
-	GitURL    string `json:"git_url"`
-	GitBranch string `json:"git_branch"`
+	GitURL    string `json:"url"`
+	GitBranch string `json:"branch"`
 }
 
 // SetDefaults ensures that sensible default values are applied to a task

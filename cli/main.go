@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"net/http"
-
 	"bytes"
+	"net/http"
 
 	"github.com/ghodss/yaml"
 )
@@ -28,6 +27,8 @@ func main() {
 	if err != nil {
 		fmt.Println("Failed to load task")
 	}
+
+	fmt.Printf("JSON %s", jsonValue)
 
 	resp, err := http.Post("http://localhost:9000/api/v1/tasks", "application/json", bytes.NewBuffer(jsonValue))
 

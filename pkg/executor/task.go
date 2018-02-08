@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +64,7 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 
 		glog.Infof("Cloning code from %s", task.Source.GitURL)
 
-		cloneCommand := "git clone $GIT_SOURCE $FREQUENCY_TASK_WORKSPACE"
+		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.GitURL, task.Workspace)
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
 			Image: "alpine/git",

@@ -1,7 +1,10 @@
 image: golang
+workspace: /go/src/github.com/owainlewis/frequency
+source:
+  gitUrl: https://github.com/wercker/getting-started-golang.git
 run:
   command:
     - bash
     - "-exc"
   args:
-    - echo "Hello, World!"
+    - echo $GOPATH

@@ -1,10 +1,11 @@
 image: golang
-workspace: /go/src/github.com/owainlewis/frequency
+workspace: /go/src/github.com/wercker/getting-started-golang
 source:
-  gitUrl: https://github.com/wercker/getting-started-golang.git
+  url: https://github.com/wercker/getting-started-golang.git
+  branch: master
 run:
   command:
     - bash
     - "-exc"
   args:
-    - echo $GOPATH
+    - go test ./...

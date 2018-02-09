@@ -48,7 +48,7 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      "workspace",
-				MountPath: "/workspace",
+				MountPath: task.Workspace,
 			},
 		},
 	}
@@ -60,11 +60,11 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 
 	glog.Infof("Task %+v", task)
 
-	if task.Source != nil {
+	if task.Source != nil && task.Source.URL != "" {
 
-		glog.Infof("Cloning code from %s", task.Source.GitURL)
+		glog.Infof("Cloning code from %s", task.Source.URL)
 
-		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.GitURL, task.Workspace)
+		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.URL, task.Workspace)
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
 			Image: "alpine/git",

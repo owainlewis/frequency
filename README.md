@@ -15,10 +15,60 @@ Kubernetes offers many advantages for CI/CD such as:
 * Run CI on your own private infrastructure
 * Utilise all the native Kubernetes tooling and security.
 
-## Concepts
+## Components
 
-#### Task
+#### API 
 
-#### Build
+The API server stores and triggers tasks to be executed.
 
-#### Trigger
+### Tasks 
+TODO
+
+### Builds
+TODO
+
+### Projects
+TODO
+
+### Triggers
+TODO
+
+#### CLI
+
+The CLI lets you execute CI actions locally.
+
+```yaml
+--
+name: unit-tests
+image: golang
+workspace: /go/src/github.com/wercker/getting-started-golang
+source:
+  domain: github.com
+  owner: wercker
+  repository: getting-started-golang
+run:
+  command:
+    - bash
+    - "-exc"
+  args:
+    - go test ./...
+```
+
+Run the task against the API server and it will execute a CI execution of the unit tests for this project.
+
+```
+fq task create -f examples/yaml/task.yaml
+```
+
+#### Triggers
+
+TODO explain
+
+#### Events
+
+TODO explain
+
+#### Orchestrator (Choreograph)
+
+This engine is responsible for orchestrating piplines of tasks to be executed. 
+

@@ -1,8 +1,10 @@
+--
 image: golang
 workspace: /go/src/github.com/wercker/getting-started-golang
 source:
-  url: https://github.com/wercker/getting-started-golang.git
-  branch: master
+  domain: github.com
+  owner: wercker
+  repository: getting-started-golang
 run:
   command:
     - bash

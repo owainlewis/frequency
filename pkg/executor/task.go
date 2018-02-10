@@ -60,11 +60,8 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 
 	glog.Infof("Task %+v", task)
 
-	if task.Source != nil && task.Source.URL != "" {
-
-		glog.Infof("Cloning code from %s", task.Source.URL)
-
-		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.URL, task.Workspace)
+	if task.Source != nil {
+		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.GetPublicCloneURL(), task.Workspace)
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
 			Image: "alpine/git",
@@ -108,20 +105,15 @@ func envVar(name, value string) v1.EnvVar {
 func buildEnvironmentVariables(task *types.Task) []v1.EnvVar {
 	var env []v1.EnvVar
 
-	// Project and general information
-	// FREQUENCY_PROJECT_NAME
-
-	// Task information
 	env = append(env, envVar("FREQUENCY_TASK_WORKSPACE", task.Workspace))
 
-	// Git Information
 	if task.Source != nil {
-
+		env = append(env, envVar("FREQUENCY_SOURCE_DOMAIN", task.Source.Domain))
+		env = append(env, envVar("FREQUENCY_SOURCE_OWNER", task.Source.Owner))
+		env = append(env, envVar("FREQUENCY_SOURCE_REPOSITORY", task.Source.Repository))
+		env = append(env, envVar("FREQUENCY_SOURCE_BRANCH", task.Source.Branch))
+		env = append(env, envVar("FREQUENCY_SOURCE_COMMIT", task.Source.Commit))
 	}
-	// FREQUENCY_GIT_DOMAIN="github.com"
-	// FREQUENCY_GIT_OWNER="oracle"
-	// FREQUENCY_GIT_REPOSITORY="terraform-kubernetes-installer"
-	// FREQUENCY_GIT_BRANCH="master"
-	// FREQUENCY_GIT_COMMIT="4fc26b093db08a6079e27016d1903b66aa93604b"
+
 	return env
 }

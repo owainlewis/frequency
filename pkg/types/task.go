@@ -8,11 +8,17 @@ import (
 
 // Task runs a single Kubernetes pod exactly once
 type Task struct {
+	Name      string      `json:"name"`
 	Image     string      `json:"image"`
 	Workspace string      `json:"workspace"`
-	Env       []v1.EnvVar `json:"env,omitempty"`
+	Env       []v1.EnvVar `json:"env"`
 	Run       run         `json:"run"`
 	Source    *Source     `json:"source"`
+}
+
+func (t *Task) Validate() []error {
+	var errs []error
+	return errs
 }
 
 // Run describes the command to run inside a Pod container

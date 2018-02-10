@@ -53,12 +53,7 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 		},
 	}
 
-	// 	// // When a source is declared as part of a job, we use an init container
-	// 	// // to go and fetch that source code from a VCS such as github.com
-	// 	// var initContainers []v1.Container
 	var initContainers []v1.Container
-
-	glog.Infof("Task %+v", task)
 
 	if task.Source != nil {
 		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.GetPublicCloneURL(), task.Workspace)

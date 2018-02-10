@@ -28,11 +28,6 @@ type run struct {
 }
 
 // Source describes the source code VCS information (e.g. Github branch and commit SHA)
-// DOMAIN="github.com"
-// OWNER="oracle"
-// REPOSITORY="terraform-kubernetes-installer"
-// BRANCH="master"
-// COMMIT="4fc26b093db08a6079e27016d1903b66aa93604b"
 type Source struct {
 	Domain     string `json:"domain"`
 	Owner      string `json:"owner"`

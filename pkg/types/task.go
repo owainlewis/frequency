@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -10,13 +12,10 @@ type Task struct {
 	Image     string      `json:"image"`
 	Workspace string      `json:"workspace"`
 	Env       []v1.EnvVar `json:"env"`
-	Run       run         `json:"run"`
 	Checkout  *Checkout   `json:"checkout"`
-}
-
-func (t *Task) Validate() []error {
-	var errs []error
-	return errs
+	Run       run         `json:"run"`
+	// A simplified implementation of the run command that gets post compiled
+	Steps []string `json:"steps"`
 }
 
 // Run describes the command to run inside a Pod container
@@ -41,4 +40,19 @@ func (t Task) SetDefaults() {
 	if t.Workspace == "" {
 		t.Workspace = "/"
 	}
+}
+
+// Validate a task is suitable to submit to the API server
+func (t Task) Validate() []error {
+	var errs []error
+
+	if t.Image == "" {
+		errs = append(errs, fmt.Errorf("Missing image"))
+	}
+
+	if (len(t.Run.Command) != 0 || len(t.Run.Args) != 0) && len(t.Steps) != 0 {
+		errs = append(errs, fmt.Errorf("Cannot declare both Run and Steps for a task"))
+	}
+
+	return errs
 }

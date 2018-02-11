@@ -1,0 +1,18 @@
+# Project level information
+image: golang
+workspace: /go/src/github.com/wercker/getting-started-golang
+checkout:
+  url: https://github.com/wercker/getting-started-golang.git
+  post:
+  - git submodule sync
+  - git submodule update --init
+
+# CI tasks
+tasks:
+  test:
+    steps:
+    - go test ./...
+  build:
+    steps:
+    - go build -o exe ./...
+    - cp exe $(FREQUENCY_OUTPUT_DIRECTORY)

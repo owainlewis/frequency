@@ -38,18 +38,40 @@ TODO
 The CLI lets you execute CI actions locally.
 
 ```yaml
+# Simple task that checks out code and runs unit tests
 image: golang
 workspace: /go/src/github.com/wercker/getting-started-golang
-source:
-  domain: github.com
-  owner: wercker
-  repository: getting-started-golang
+checkout:
+  url: https://github.com/wercker/getting-started-golang.git
+steps:
+  - go test ./...
+  - echo $(env)
+```
+
+Complex example
+
+```yaml
+image: golang
+workspace: /go/src/github.com/wercker/getting-started-golang
+env:
+  - name: DATABASE_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: mysql-credentials
+        key: username
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mysql-credentials
+        key: password
+checkout:
+  url: https://github.com/wercker/getting-started-golang.git
 run:
   command:
     - bash
     - "-exc"
   args:
-    - go test ./...
+    - go test ./...; echo $(pwd); ls -la; echo $(env)
 ```
 
 Run the task against the API server and it will execute a CI execution of the unit tests for this project.

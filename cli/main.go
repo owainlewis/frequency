@@ -20,7 +20,7 @@ func newTaskFromFile(filepath string) ([]byte, error) {
 }
 
 func main() {
-	jsonValue, err := newTaskFromFile("examples/yaml/task.yaml")
+	jsonValue, err := newTaskFromFile("examples/tasks/simple.yaml")
 	if err != nil {
 		fmt.Println("Failed to load task")
 	}

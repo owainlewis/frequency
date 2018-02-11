@@ -40,13 +40,16 @@ func (e DefaultTaskExecutor) ExecuteTask(task types.Task) error {
 }
 
 func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
+
+	cmd, args := prepareCommandArgs(task)
+
 	primary := v1.Container{
 		Name:       "primary",
 		Image:      task.Image,
 		WorkingDir: task.Workspace,
-		Env:        task.Env,
-		Command:    task.Run.Command,
-		Args:       task.Run.Args,
+		Env:        buildEnvironmentVariables(task),
+		Command:    cmd,
+		Args:       args,
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      "workspace",
@@ -91,7 +94,7 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 		},
 	}
 
-	pod.SetGenerateName("task-")
+	pod.SetGenerateName(fmt.Sprintf("task-%s", task.Name))
 
 	return pod
 }
@@ -103,8 +106,14 @@ func envVar(name, value string) v1.EnvVar {
 	}
 }
 
-func buildEnvironmentVariables(task *types.Task) []v1.EnvVar {
+func buildEnvironmentVariables(task types.Task) []v1.EnvVar {
 	var env []v1.EnvVar
+
+	if task.Env != nil {
+		for _, e := range task.Env {
+			env = append(env, e)
+		}
+	}
 
 	env = append(env, envVar("FREQUENCY_TASK_WORKSPACE", task.Workspace))
 
@@ -127,4 +136,12 @@ func prepareCheckout(checkout *types.Checkout) string {
 	}
 
 	return strings.Join(args, "; ")
+}
+
+func prepareCommandArgs(task types.Task) ([]string, []string) {
+	if len(task.Steps) != 0 {
+		return []string{"bash", "-exc"}, []string{strings.Join(task.Steps, "; ")}
+	}
+
+	return task.Run.Command, task.Run.Args
 }

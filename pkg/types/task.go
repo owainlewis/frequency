@@ -8,7 +8,7 @@ import (
 
 // Task runs a single Kubernetes pod exactly once
 type Task struct {
-	Type      string      `json:"type"`
+	Name      string      `json:"name"`
 	Image     string      `json:"image"`
 	Workspace string      `json:"workspace"`
 	Env       []v1.EnvVar `json:"env"`

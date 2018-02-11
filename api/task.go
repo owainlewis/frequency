@@ -2,13 +2,15 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/owainlewis/frequency/pkg/types"
 	"github.com/owainlewis/frequency/pkg/validation"
 )
+
+type errorResponse struct {
+	Error string `json:"error"`
+}
 
 // CreateTask will create a new task. It will be executed asynchronously
 // POST /api/v1/tasks
@@ -19,7 +21,7 @@ func (api Api) CreateTask(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&task)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()))
+		json.NewEncoder(w).Encode(errorResponse{Error: err.Error()})
 		return
 	}
 
@@ -28,15 +30,14 @@ func (api Api) CreateTask(w http.ResponseWriter, r *http.Request) {
 	errs := task.Validate()
 	if len(errs) != 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, fmt.Sprintf(`{"error": "%s"}`, validation.ConsolidateErrors(errs)))
+		json.NewEncoder(w).Encode(errorResponse{Error: validation.ConsolidateErrors(errs)})
 		return
 	}
 
 	err = api.Executor.TaskExecutor.ExecuteTask(task)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()))
+		json.NewEncoder(w).Encode(errorResponse{Error: err.Error()})
 		return
 	}
 

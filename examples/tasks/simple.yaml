@@ -1,0 +1,8 @@
+# Simple task that checks out code and runs unit tests
+image: golang
+workspace: /go/src/github.com/wercker/getting-started-golang
+checkout:
+  url: https://github.com/wercker/getting-started-golang.git
+steps:
+  - go test ./...
+  - echo $(env)

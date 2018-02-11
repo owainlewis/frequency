@@ -1,0 +1,21 @@
+image: golang
+workspace: /go/src/github.com/wercker/getting-started-golang
+env:
+  - name: DATABASE_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: mysql-credentials
+        key: username
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mysql-credentials
+        key: password
+checkout:
+  url: https://github.com/wercker/getting-started-golang.git
+run:
+  command:
+    - bash
+    - "-exc"
+  args:
+    - go test ./...; echo $(pwd); ls -la; echo $(env)

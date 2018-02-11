@@ -25,11 +25,12 @@ func main() {
 		fmt.Println("Failed to load task")
 	}
 
-	fmt.Printf("JSON %s", jsonValue)
 	resp, err := http.Post("http://localhost:9000/api/v1/tasks", "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		fmt.Printf("Err %s", err)
 	}
 
-	fmt.Printf("Response %d", resp.StatusCode)
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	fmt.Printf("%d: %s", resp.StatusCode, body)
 }

@@ -1,5 +1,8 @@
-image: golang
+type: pod
+image: golang:latest
 workspace: /go/src/github.com/wercker/getting-started-golang
+env:
+  - K8S_PASSWORD: foo
 checkout:
   url: https://github.com/wercker/getting-started-golang.git
 run:
@@ -7,4 +10,4 @@ run:
     - bash
     - "-exc"
   args:
-    - go test ./...; echo $(pwd); ls -la
+    - go test ./...; echo $(pwd); ls -la; echo $(env)

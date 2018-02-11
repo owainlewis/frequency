@@ -17,11 +17,11 @@ Kubernetes offers many advantages for CI/CD such as:
 
 ## Components
 
-#### API 
+#### API
 
 The API server stores and triggers tasks to be executed.
 
-### Tasks 
+### Tasks
 TODO
 
 ### Builds
@@ -38,8 +38,6 @@ TODO
 The CLI lets you execute CI actions locally.
 
 ```yaml
---
-name: unit-tests
 image: golang
 workspace: /go/src/github.com/wercker/getting-started-golang
 source:
@@ -70,5 +68,5 @@ TODO explain
 
 #### Orchestrator (Choreograph)
 
-This engine is responsible for orchestrating piplines of tasks to be executed. 
+This engine is responsible for orchestrating piplines of tasks to be executed.
 

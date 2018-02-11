@@ -8,14 +8,13 @@ import (
 
 // Task runs a single Kubernetes pod exactly once
 type Task struct {
-	Name      string      `json:"name"`
+	Type      string      `json:"type"`
 	Image     string      `json:"image"`
 	Workspace string      `json:"workspace"`
 	Env       []v1.EnvVar `json:"env"`
 	Checkout  *Checkout   `json:"checkout"`
 	Run       run         `json:"run"`
-	// A simplified implementation of the run command that gets post compiled
-	Steps []string `json:"steps"`
+	Steps     []string    `json:"steps"`
 }
 
 // Run describes the command to run inside a Pod container
@@ -29,11 +28,6 @@ type Checkout struct {
 	URL  string   `json:"url"`
 	Post []string `json:"post"`
 }
-
-// If set this will checkout the source code into a different working directory
-// Destination string `json:"destination"`
-// Branch      string `json:"branch"`
-// Commit      string `json:"commit"`
 
 // SetDefaults ensures that sensible default values are applied to a task
 func (t Task) SetDefaults() {

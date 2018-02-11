@@ -2,9 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/owainlewis/frequency/pkg/types"
+	"github.com/owainlewis/frequency/pkg/validation"
 )
 
 // CreateTask will create a new task. It will be executed asynchronously
@@ -16,13 +19,24 @@ func (api Api) CreateTask(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&task)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()))
+		return
 	}
 
 	task.SetDefaults()
+
+	errs := task.Validate()
+	if len(errs) != 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, fmt.Sprintf(`{"error": "%s"}`, validation.ConsolidateErrors(errs)))
+		return
+	}
+
 	err = api.Executor.TaskExecutor.ExecuteTask(task)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()))
 		return
 	}
 

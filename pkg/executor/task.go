@@ -8,6 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
 
+	"strings"
+
 	"github.com/owainlewis/frequency/pkg/types"
 )
 
@@ -55,16 +57,20 @@ func (e DefaultTaskExecutor) newPod(task types.Task) *v1.Pod {
 
 	var initContainers []v1.Container
 
-	if task.Source != nil {
-		cloneCommand := fmt.Sprintf("git clone %s %s", task.Source.GetPublicCloneURL(), task.Workspace)
+	if task.Checkout != nil {
+		checkoutCommand := prepareCheckout(task.Checkout)
+
 		sourceCloneContainer := v1.Container{
 			Name:  "setup",
-			Image: "alpine/git",
+			Image: "alpine/git:latest",
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "workspace",
 				MountPath: task.Workspace,
 			}},
-			Command: []string{"ash", "-c", cloneCommand}}
+			WorkingDir: task.Workspace,
+			Command:    []string{"ash", "-c"},
+			Args:       []string{checkoutCommand},
+		}
 
 		initContainers = append(initContainers, sourceCloneContainer)
 	}
@@ -102,13 +108,23 @@ func buildEnvironmentVariables(task *types.Task) []v1.EnvVar {
 
 	env = append(env, envVar("FREQUENCY_TASK_WORKSPACE", task.Workspace))
 
-	if task.Source != nil {
-		env = append(env, envVar("FREQUENCY_SOURCE_DOMAIN", task.Source.Domain))
-		env = append(env, envVar("FREQUENCY_SOURCE_OWNER", task.Source.Owner))
-		env = append(env, envVar("FREQUENCY_SOURCE_REPOSITORY", task.Source.Repository))
-		env = append(env, envVar("FREQUENCY_SOURCE_BRANCH", task.Source.Branch))
-		env = append(env, envVar("FREQUENCY_SOURCE_COMMIT", task.Source.Commit))
+	if task.Checkout != nil {
+		env = append(env, envVar("FREQUENCY_CHECKOUT_URL", task.Checkout.URL))
 	}
 
 	return env
+}
+
+// Builds the correct checkout command including any post actions
+func prepareCheckout(checkout *types.Checkout) string {
+	var args []string
+
+	cloneCommand := fmt.Sprintf("git clone %s", checkout.URL)
+	args = append(args, cloneCommand)
+
+	for _, post := range checkout.Post {
+		args = append(args, post)
+	}
+
+	return strings.Join(args, "; ")
 }

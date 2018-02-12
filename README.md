@@ -51,6 +51,7 @@ steps:
 Complex example
 
 ```yaml
+kind: kubernetes.io/Pod
 image: golang
 workspace: /go/src/github.com/wercker/getting-started-golang
 env:
